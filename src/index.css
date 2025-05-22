@@ -1,0 +1,111 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 280 100% 99%;
+    --foreground: 280 10% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 280 10% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 280 10% 10%;
+
+    --primary: 276 100% 64%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 182 75% 60%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 300 70% 95%;
+    --muted-foreground: 280 5% 45%;
+
+    --accent: 54 100% 75%;
+    --accent-foreground: 280 10% 10%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 300 10% 90%;
+    --input: 300 10% 90%;
+    --ring: 276 100% 64%;
+
+    --radius: 1rem;
+
+    --sidebar-background: 280 100% 99%;
+    --sidebar-foreground: 280 10% 10%;
+    --sidebar-primary: 276 100% 64%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 300 70% 95%;
+    --sidebar-accent-foreground: 280 10% 10%;
+    --sidebar-border: 300 10% 90%;
+    --sidebar-ring: 276 100% 64%;
+  }
+
+  .dark {
+    --background: 280 30% 10%;
+    --foreground: 0 0% 98%;
+
+    --card: 280 25% 15%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 280 25% 15%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 276 100% 64%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 182 75% 60%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 280 25% 20%;
+    --muted-foreground: 280 10% 70%;
+
+    --accent: 54 100% 75%;
+    --accent-foreground: 280 30% 10%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 280 25% 20%;
+    --input: 280 25% 20%;
+    --ring: 276 100% 64%;
+
+    --sidebar-background: 280 25% 15%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 276 100% 64%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 280 25% 20%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 280 25% 20%;
+    --sidebar-ring: 276 100% 64%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer components {
+  .admin-card {
+    @apply bg-white rounded-2xl shadow-md border border-artist-teal/20 p-6 transition-all hover:shadow-lg;
+  }
+  
+  .artist-gradient-bg {
+    @apply bg-gradient-to-br from-artist-purple/10 via-white to-artist-teal/10;
+  }
+
+  .artist-button {
+    @apply px-4 py-2 bg-artist-purple text-white rounded-full hover:bg-artist-purple/90 transition-all;
+  }
+}
