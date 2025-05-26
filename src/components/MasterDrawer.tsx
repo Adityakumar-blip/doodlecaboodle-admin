@@ -99,6 +99,7 @@ export function MasterDrawer({
       open={isOpen}
       onOpenChange={onOpenChange}
       shouldScaleBackground={false}
+      direction="right"
     >
       {trigger && <DrawerTrigger asChild>{trigger}</DrawerTrigger>}
       <DrawerContent className={drawerClasses}>{renderContent()}</DrawerContent>

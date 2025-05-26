@@ -27,6 +27,7 @@ import SeasonalCollectionsPage from "./pages/collections/SeasonalCollections";
 import ThematicCollectionsPage from "./pages/collections/ThematicCollections";
 import UserPage from "./pages/Users";
 import ProductList from "./pages/Product";
+import ProductCategories from "./pages/ProductCategories";
 
 const queryClient = new QueryClient();
 
@@ -84,6 +85,16 @@ const App = () => (
                   </AdminLayoutWrapper>
                 }
               />
+
+              <Route
+                path="/product-categories"
+                element={
+                  <AdminLayoutWrapper>
+                    <ProductCategories />
+                  </AdminLayoutWrapper>
+                }
+              />
+
               <Route
                 path="/messages"
                 element={
