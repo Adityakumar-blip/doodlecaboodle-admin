@@ -144,7 +144,7 @@ const MainSidebar = ({
         <div className="flex items-center gap-2">
           {!collapsed && (
             <span className="font-bold text-xl text-artist-purple">
-              DoodlecaBoodle
+              DoodleCaboodle
             </span>
           )}
           <SidebarTrigger

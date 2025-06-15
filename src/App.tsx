@@ -28,6 +28,8 @@ import ThematicCollectionsPage from "./pages/collections/ThematicCollections";
 import UserPage from "./pages/Users";
 import ProductList from "./pages/Product";
 import ProductCategories from "./pages/ProductCategories";
+import Collections from "./pages/Collections";
+import Artists from "./pages/Artists";
 
 const queryClient = new QueryClient();
 
@@ -82,6 +84,24 @@ const App = () => (
                 element={
                   <AdminLayoutWrapper>
                     <ProductList />
+                  </AdminLayoutWrapper>
+                }
+              />
+
+              <Route
+                path="/collections"
+                element={
+                  <AdminLayoutWrapper>
+                    <Collections />
+                  </AdminLayoutWrapper>
+                }
+              />
+
+              <Route
+                path="/artists"
+                element={
+                  <AdminLayoutWrapper>
+                    <Artists />
                   </AdminLayoutWrapper>
                 }
               />

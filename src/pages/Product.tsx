@@ -1,9 +1,13 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { DataTable, DataTableColumn } from "@/components/DataTable";
 import { MasterDrawer } from "@/components/MasterDrawer";
+import ProductModal from "@/views/ProductModal";
+
+import { collection, getDocs, deleteDoc, doc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 type Product = {
   id: string;
@@ -36,6 +40,23 @@ const initialProducts: Product[] = [
 export default function ProductList() {
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const fetchProducts = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, "products"));
+      const fetchedCategories = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Product[];
+      setProducts(fetchedCategories);
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
 
   // Add product form state
   const [formData, setFormData] = useState<Omit<Product, "id">>({
@@ -94,59 +115,11 @@ export default function ProductList() {
         pagination={{ pageSize: 5, pageSizeOptions: [5, 10, 20] }}
       />
 
-      <MasterDrawer
-        title="Add Product"
-        isOpen={drawerOpen}
-        onOpenChange={setDrawerOpen}
-        size="md"
-        position="right"
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setDrawerOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleAddProduct}>Save</Button>
-          </div>
-        }
-      >
-        <form className="space-y-4 p-2">
-          <Input
-            placeholder="Product Name"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          />
-          <Textarea
-            placeholder="Description"
-            value={formData.description}
-            onChange={(e) =>
-              setFormData({ ...formData, description: e.target.value })
-            }
-          />
-          <Input
-            type="number"
-            placeholder="Price"
-            value={formData.price}
-            onChange={(e) =>
-              setFormData({ ...formData, price: Number(e.target.value) })
-            }
-          />
-          <Input
-            type="number"
-            placeholder="Quantity"
-            value={formData.quantity}
-            onChange={(e) =>
-              setFormData({ ...formData, quantity: Number(e.target.value) })
-            }
-          />
-          <Input
-            placeholder="Category"
-            value={formData.category}
-            onChange={(e) =>
-              setFormData({ ...formData, category: e.target.value })
-            }
-          />
-        </form>
-      </MasterDrawer>
+      <ProductModal
+        drawerOpen={drawerOpen}
+        onProductAdded={() => {}}
+        setDrawerOpen={setDrawerOpen}
+      />
     </div>
   );
 }
