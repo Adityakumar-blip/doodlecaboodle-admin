@@ -12,18 +12,22 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { X, Plus } from "lucide-react";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useFormik } from "formik";
 import * as Yup from "yup";
-import { collection, addDoc, getFirestore } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL, getStorage } from "firebase/storage";
+import {
+  collection,
+  addDoc,
+  updateDoc,
+  doc,
+  getFirestore,
+} from "firebase/firestore";
 import { toast } from "sonner";
 import { uploadImagesToCloudinary } from "@/services/CloudinaryUpload";
 
 const db = getFirestore();
-const storage = getStorage();
 
 const validationSchema = Yup.object({
   name: Yup.string()
@@ -32,6 +36,9 @@ const validationSchema = Yup.object({
   bio: Yup.string()
     .min(10, "Bio must be at least 10 characters")
     .required("Bio is required"),
+  specializesIn: Yup.string()
+    .min(5, "Specialization must be at least 5 characters")
+    .required("Specialization is required"),
   email: Yup.string().email("Invalid email format").nullable(),
   phone: Yup.string()
     .matches(/^\+?[1-9]\d{1,14}$/, "Invalid phone number format")
@@ -62,9 +69,25 @@ const validationSchema = Yup.object({
     .required("Status is required"),
 });
 
-const ArtistModal = ({ drawerOpen, setDrawerOpen, onArtistAdded }) => {
-  const [profileImageFile, setProfileImageFile] = useState(null);
-  const [profileImagePreview, setProfileImagePreview] = useState(null);
+type ArtistModalProps = {
+  drawerOpen: boolean;
+  setDrawerOpen: (open: boolean) => void;
+  onArtistAdded: (artist: any) => void;
+  onArtistUpdated: (artist: any) => void;
+  selectedArtist: any | null;
+};
+
+const ArtistModal: React.FC<ArtistModalProps> = ({
+  drawerOpen,
+  setDrawerOpen,
+  onArtistAdded,
+  onArtistUpdated,
+  selectedArtist,
+}) => {
+  const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
+  const [profileImagePreview, setProfileImagePreview] = useState<string | null>(
+    null
+  );
   const [newSocialLink, setNewSocialLink] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -72,6 +95,7 @@ const ArtistModal = ({ drawerOpen, setDrawerOpen, onArtistAdded }) => {
     initialValues: {
       name: "",
       bio: "",
+      specializesIn: "",
       email: "",
       phone: "",
       profileImage: null,
@@ -80,12 +104,34 @@ const ArtistModal = ({ drawerOpen, setDrawerOpen, onArtistAdded }) => {
     },
     validationSchema,
     onSubmit: async (values) => {
-      await handleAddArtist(values);
+      await handleSubmit(values);
     },
   });
 
-  const handleProfileImageChange = (e) => {
-    const file = e.target.files[0];
+  useEffect(() => {
+    if (selectedArtist) {
+      formik.setValues({
+        name: selectedArtist.name || "",
+        bio: selectedArtist.bio || "",
+        specializesIn: selectedArtist.specializesIn || "",
+        email: selectedArtist.email || "",
+        phone: selectedArtist.phone || "",
+        profileImage: null,
+        socialLinks: selectedArtist.socialLinks || [],
+        status: selectedArtist.status || "active",
+      });
+      setProfileImagePreview(selectedArtist.profileImage || null);
+      setProfileImageFile(null);
+    } else {
+      formik.resetForm();
+      setProfileImagePreview(null);
+      setProfileImageFile(null);
+      setNewSocialLink("");
+    }
+  }, [selectedArtist]);
+
+  const handleProfileImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (file) {
       setProfileImageFile(file);
       setProfileImagePreview(URL.createObjectURL(file));
@@ -106,59 +152,76 @@ const ArtistModal = ({ drawerOpen, setDrawerOpen, onArtistAdded }) => {
     }
   };
 
-  const removeSocialLink = (index) => {
+  const removeSocialLink = (index: number) => {
     const updatedLinks = formik.values.socialLinks.filter(
-      (_, i) => i !== index
+      (_: string, i: number) => i !== index
     );
     formik.setFieldValue("socialLinks", updatedLinks);
   };
 
-  const uploadProfileImage = async (file) => {
+  const uploadProfileImage = async (
+    file: File | null
+  ): Promise<string | null> => {
     if (!file) return null;
     try {
-      // Use Cloudinary for consistency with ProductModal images
-      const [imageUrl] = await uploadImagesToCloudinary([file]);
+      const imageUrl = await uploadImagesToCloudinary(file);
+      if (!imageUrl) {
+        throw new Error("Cloudinary upload returned no URL");
+      }
+      console.log("Cloudinary response URL:", imageUrl); // Debug log
       return imageUrl;
     } catch (error) {
-      console.error("Error uploading profile image:", error);
+      console.error("Error uploading profile image to Cloudinary:", error);
       throw new Error("Failed to upload profile image");
     }
   };
 
-  const handleAddArtist = async (values) => {
+  const handleSubmit = async (values: any) => {
     setLoading(true);
     try {
-      let profileImageUrl = null;
+      let profileImageUrl: string | null = null;
       if (profileImageFile) {
         profileImageUrl = await uploadProfileImage(profileImageFile);
+      } else if (selectedArtist?.profileImage && !profileImageFile) {
+        profileImageUrl = selectedArtist.profileImage;
       }
 
       const artistData = {
-        ...values,
-        profileImage: profileImageUrl,
-        createdAt: new Date(),
+        name: values.name,
+        bio: values.bio,
+        specializesIn: values.specializesIn,
+        email: values.email || null,
+        phone: values.phone || null,
+        profileImage: profileImageUrl || null,
+        socialLinks: values.socialLinks.length > 0 ? values.socialLinks : [],
+        status: values.status,
         updatedAt: new Date(),
+        ...(selectedArtist ? {} : { createdAt: new Date() }),
       };
 
-      // Remove profileImage file from data (store URL instead)
-      delete artistData.profileImage;
-
-      const docRef = await addDoc(collection(db, "artists"), artistData);
-
-      toast.success("Artist added successfully!");
+      if (selectedArtist) {
+        const artistRef = doc(db, "artists", selectedArtist.id);
+        await updateDoc(artistRef, artistData);
+        toast.success("Artist updated successfully!");
+        onArtistUpdated({ id: selectedArtist.id, ...artistData });
+      } else {
+        const docRef = await addDoc(collection(db, "artists"), artistData);
+        toast.success("Artist added successfully!");
+        onArtistAdded({ id: docRef.id, ...artistData });
+      }
 
       formik.resetForm();
       setProfileImageFile(null);
       setProfileImagePreview(null);
       setNewSocialLink("");
       setDrawerOpen(false);
-
-      if (onArtistAdded) {
-        onArtistAdded({ id: docRef.id, ...artistData });
-      }
     } catch (error) {
-      console.error("Error adding artist:", error);
-      toast.error("Failed to add artist. Please try again.");
+      console.error("Error saving artist:", error);
+      toast.error(
+        `Failed to ${
+          selectedArtist ? "update" : "add"
+        } artist. Please try again.`
+      );
     } finally {
       setLoading(false);
     }
@@ -174,7 +237,7 @@ const ArtistModal = ({ drawerOpen, setDrawerOpen, onArtistAdded }) => {
 
   return (
     <MasterDrawer
-      title="Add New Artist"
+      title={selectedArtist ? "Edit Artist" : "Add New Artist"}
       isOpen={drawerOpen}
       onOpenChange={setDrawerOpen}
       size="full"
@@ -188,7 +251,11 @@ const ArtistModal = ({ drawerOpen, setDrawerOpen, onArtistAdded }) => {
             onClick={formik.handleSubmit}
             disabled={loading || !formik.isValid}
           >
-            {loading ? "Saving..." : "Save Artist"}
+            {loading
+              ? "Saving..."
+              : selectedArtist
+              ? "Update Artist"
+              : "Save Artist"}
           </Button>
         </div>
       }
@@ -243,6 +310,28 @@ const ArtistModal = ({ drawerOpen, setDrawerOpen, onArtistAdded }) => {
               />
               {formik.touched.bio && formik.errors.bio && (
                 <p className="text-red-500 text-sm mt-1">{formik.errors.bio}</p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="specializesIn">Specializes In *</Label>
+              <Input
+                id="specializesIn"
+                name="specializesIn"
+                placeholder="e.g., Abstract Painting, Digital Art"
+                value={formik.values.specializesIn}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                className={
+                  formik.touched.specializesIn && formik.errors.specializesIn
+                    ? "border-red-500"
+                    : ""
+                }
+              />
+              {formik.touched.specializesIn && formik.errors.specializesIn && (
+                <p className="text-red-500 text-sm mt-1">
+                  {formik.errors.specializesIn}
+                </p>
               )}
             </div>
           </CardContent>
@@ -356,7 +445,7 @@ const ArtistModal = ({ drawerOpen, setDrawerOpen, onArtistAdded }) => {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              {formik.values.socialLinks.map((link, index) => (
+              {formik.values.socialLinks.map((link: string, index: number) => (
                 <Badge
                   key={index}
                   variant="secondary"

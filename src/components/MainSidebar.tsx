@@ -37,6 +37,7 @@ import {
   DamIcon,
   PinIcon,
   GiftIcon,
+  TicketPercent,
 } from "lucide-react";
 
 interface MainSidebarProps {
@@ -111,12 +112,19 @@ const MainSidebar = ({
       showTo: true,
     },
     {
+      to: "/works",
+      label: "Our Works",
+      icon: GiftIcon,
+      showTo: true,
+    },
+    {
       to: "/collections",
       label: "Collections",
       icon: PinIcon,
       showTo: true,
     },
     { to: "/orders", label: "Orders", icon: ShoppingCart, showTo: true },
+    { to: "/coupons", label: "Coupons", icon: TicketPercent, showTo: true },
   ];
 
   // // Define artwork categories

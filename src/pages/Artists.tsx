@@ -3,7 +3,13 @@ import { Button } from "@/components/ui/button";
 import { DataTable, DataTableColumn } from "@/components/DataTable";
 import { MasterDrawer } from "@/components/MasterDrawer";
 import ArtistModal from "@/views/ArtistModal";
-import { collection, getDocs, deleteDoc, doc } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  deleteDoc,
+  doc,
+  updateDoc,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 
@@ -11,6 +17,7 @@ type Artist = {
   id: string;
   name: string;
   bio: string;
+  specializesIn: string;
   email?: string;
   phone?: string;
   profileImage?: string;
@@ -23,6 +30,7 @@ type Artist = {
 export default function Artists() {
   const [artists, setArtists] = useState<Artist[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null);
 
   const fetchArtists = async () => {
     try {
@@ -47,6 +55,16 @@ export default function Artists() {
     setDrawerOpen(false);
   };
 
+  const handleArtistUpdated = (updatedArtist: Artist) => {
+    setArtists((prev) =>
+      prev.map((artist) =>
+        artist.id === updatedArtist.id ? updatedArtist : artist
+      )
+    );
+    setDrawerOpen(false);
+    setSelectedArtist(null);
+  };
+
   const handleDeleteArtist = async (artistId: string) => {
     try {
       await deleteDoc(doc(db, "artists", artistId));
@@ -56,6 +74,11 @@ export default function Artists() {
       console.error("Error deleting artist:", error);
       toast.error("Failed to delete artist");
     }
+  };
+
+  const handleEditArtist = (artist: Artist) => {
+    setSelectedArtist(artist);
+    setDrawerOpen(true);
   };
 
   const columns: DataTableColumn<Artist>[] = [
@@ -69,6 +92,12 @@ export default function Artists() {
       id: "bio",
       header: "Bio",
       cell: (item) => <div className="max-w-xs truncate">{item.bio}</div>,
+    },
+    {
+      id: "specializesIn",
+      header: "Specializes In",
+      cell: (item) => item.specializesIn || "N/A",
+      sortable: true,
     },
     {
       id: "email",
@@ -98,13 +127,22 @@ export default function Artists() {
       id: "actions",
       header: "Actions",
       cell: (item) => (
-        <Button
-          variant="destructive"
-          size="sm"
-          onClick={() => handleDeleteArtist(item.id)}
-        >
-          Delete
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleEditArtist(item)}
+          >
+            Edit
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => handleDeleteArtist(item.id)}
+          >
+            Delete
+          </Button>
+        </div>
       ),
     },
   ];
@@ -113,7 +151,14 @@ export default function Artists() {
     <div className="p-4 space-y-4">
       <div className="flex justify-between items-center">
         <h1 className="text-xl font-semibold">All Artists</h1>
-        <Button onClick={() => setDrawerOpen(true)}>Add Artist</Button>
+        <Button
+          onClick={() => {
+            setSelectedArtist(null);
+            setDrawerOpen(true);
+          }}
+        >
+          Add Artist
+        </Button>
       </div>
 
       <DataTable
@@ -128,6 +173,8 @@ export default function Artists() {
         drawerOpen={drawerOpen}
         setDrawerOpen={setDrawerOpen}
         onArtistAdded={handleArtistAdded}
+        onArtistUpdated={handleArtistUpdated}
+        selectedArtist={selectedArtist}
       />
     </div>
   );

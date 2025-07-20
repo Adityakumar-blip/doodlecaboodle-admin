@@ -30,6 +30,8 @@ import ProductList from "./pages/Product";
 import ProductCategories from "./pages/ProductCategories";
 import Collections from "./pages/Collections";
 import Artists from "./pages/Artists";
+import WorkList from "./pages/Works";
+import Coupons from "./pages/Coupons";
 
 const queryClient = new QueryClient();
 
@@ -87,6 +89,14 @@ const App = () => (
                   </AdminLayoutWrapper>
                 }
               />
+              <Route
+                path="/works"
+                element={
+                  <AdminLayoutWrapper>
+                    <WorkList />
+                  </AdminLayoutWrapper>
+                }
+              />
 
               <Route
                 path="/collections"
@@ -102,6 +112,15 @@ const App = () => (
                 element={
                   <AdminLayoutWrapper>
                     <Artists />
+                  </AdminLayoutWrapper>
+                }
+              />
+
+              <Route
+                path="/coupons"
+                element={
+                  <AdminLayoutWrapper>
+                    <Coupons />
                   </AdminLayoutWrapper>
                 }
               />
