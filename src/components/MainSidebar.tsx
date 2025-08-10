@@ -5,39 +5,29 @@ import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
-  SidebarGroupContent,
   SidebarGroupLabel,
+  SidebarGroupContent,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
   SidebarTrigger,
+  SidebarRail, // Add SidebarRail import
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   LayoutDashboard,
-  Image,
-  FolderOpen,
-  Calendar,
   MessageSquare,
-  Bell,
-  LogOut,
-  Palette,
-  Brush,
-  FileImage,
-  Images,
-  Menu,
-  Users,
-  ShoppingCart,
   Users2,
+  Users,
   DamIcon,
-  PinIcon,
   GiftIcon,
+  PinIcon,
+  ShoppingCart,
   TicketPercent,
+  LogOut,
+  Menu,
 } from "lucide-react";
 
 interface MainSidebarProps {
@@ -127,43 +117,28 @@ const MainSidebar = ({
     { to: "/coupons", label: "Coupons", icon: TicketPercent, showTo: true },
   ];
 
-  // // Define artwork categories
-  // const artworkCategories = [
-  //   { to: "/artworks/paintings", label: "Paintings", icon: Palette },
-  //   { to: "/artworks/sketches", label: "Sketches", icon: Brush },
-  //   { to: "/artworks/digital", label: "Digital Art", icon: FileImage },
-  //   { to: "/artworks/mixed-media", label: "Mixed Media", icon: Images },
-  // ];
-
-  // // Define collection categories
-  // const collectionCategories = [
-  //   { to: "/collections/featured", label: "Featured" },
-  //   { to: "/collections/seasonal", label: "Seasonal" },
-  //   { to: "/collections/thematic", label: "Thematic" },
-  // ];
-
   return (
     <Sidebar
       className={`border-r border-border transition-all duration-300 ${
         collapsed ? "w-16" : "w-64"
       }`}
+      collapsible="icon" // Ensure collapsible is set to "icon" for collapsed state
     >
       <div className="flex h-14 items-center border-b px-4">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-1">
           {!collapsed && (
             <span className="font-bold text-xl text-artist-purple">
               DoodleCaboodle
             </span>
           )}
-          <SidebarTrigger
-            onClick={() => setCollapsed(!collapsed)}
-            className="ml-auto"
-          >
-            <Menu className="h-5 w-5" />
-          </SidebarTrigger>
         </div>
+        <SidebarTrigger
+          onClick={() => setCollapsed(!collapsed)}
+          className="ml-auto"
+        >
+          <Menu className="h-5 w-5" />
+        </SidebarTrigger>
       </div>
-
       <SidebarContent className="h-[calc(100vh-theme(spacing.14))]">
         <SidebarGroup>
           <SidebarGroupLabel className={`${collapsed ? "sr-only" : ""}`}>
@@ -175,7 +150,7 @@ const MainSidebar = ({
                 .filter((item) => item.showTo)
                 .map((item) => (
                   <SidebarMenuItem key={item.to}>
-                    <SidebarMenuButton asChild>
+                    <SidebarMenuButton asChild tooltip={item.label}>
                       <NavLink
                         to={item.to}
                         end={item.to === "/dashboard"}
@@ -251,6 +226,7 @@ const MainSidebar = ({
           </div>
         </div>
       </SidebarContent>
+      <SidebarRail /> {/* Add SidebarRail for toggle functionality */}
     </Sidebar>
   );
 };

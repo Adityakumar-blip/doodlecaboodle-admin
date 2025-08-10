@@ -107,7 +107,7 @@ export default function Coupons() {
         if (item.type === "packaging") return "Free Packaging";
         return item.discountType === "percentage"
           ? `${item.discountValue}%`
-          : `$${item.discountValue}`;
+          : `${item.discountValue}`;
       },
     },
     {
