@@ -3,12 +3,7 @@ import { Button } from "@/components/ui/button";
 import { DataTable, DataTableColumn } from "@/components/DataTable";
 import ProductCategoriesModal from "@/views/ProductCategoriesModal";
 
-import {
-  collection,
-  getDocs,
-  deleteDoc,
-  doc,
-} from "firebase/firestore";
+import { collection, getDocs, deleteDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Eye, Pencil, Trash2 } from "lucide-react";
 
@@ -25,7 +20,9 @@ type Product = {
 export default function ProductCategories() {
   const [categories, setCategories] = useState<Product[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<Product | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<Product | null>(
+    null
+  );
   const [modalMode, setModalMode] = useState<"view" | "edit" | "add">("add");
 
   // Fetch categories from Firestore
@@ -36,6 +33,7 @@ export default function ProductCategories() {
         id: doc.id,
         ...doc.data(),
       })) as Product[];
+      console.log("fetched categories", fetchedCategories);
       setCategories(fetchedCategories);
     } catch (error) {
       console.error("Error fetching categories:", error);

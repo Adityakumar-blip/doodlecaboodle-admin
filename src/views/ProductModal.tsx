@@ -12,13 +12,27 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { X, Plus } from "lucide-react";
 import React, { useState, useEffect } from "react";
 import { useFormik } from "formik";
 import * as Yup from "yup";
-import { collection, addDoc, getDocs, getFirestore } from "firebase/firestore";
+import {
+  collection,
+  addDoc,
+  getDocs,
+  getFirestore,
+  updateDoc,
+  doc,
+} from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL, getStorage } from "firebase/storage";
 import { toast } from "sonner";
 import { uploadImagesToCloudinary } from "@/services/CloudinaryUpload";
@@ -53,6 +67,7 @@ const validationSchema = Yup.object({
   price: Yup.number()
     .positive("Price must be positive")
     .required("Price is required"),
+
   quantity: Yup.number()
     .integer("Quantity must be a whole number")
     .min(0, "Quantity cannot be negative")
@@ -77,7 +92,6 @@ const validationSchema = Yup.object({
         width: Yup.number()
           .positive("Width must be positive")
           .required("Width is required"),
-        height: Yup.number().positive("Height must be positive"),
         unit: Yup.string().required("Unit is required"),
         priceAdjustment: Yup.number()
           .min(0, "Price adjustment cannot be negative")
@@ -95,30 +109,11 @@ const validationSchema = Yup.object({
     .of(Yup.string().required())
     .min(1, "At least one material is required"),
   weight: Yup.number().positive("Weight must be positive"),
-  media: Yup.array()
-    .min(1, "At least one media file (image or video) is required")
-    .test(
-      "file-size",
-      "Each file must be less than 100MB",
-      (files) =>
-        !files || files.every((file: File) => file.size <= 100 * 1024 * 1024)
-    )
-    .test(
-      "file-type",
-      "Only image (JPEG, PNG, GIF) or video (MP4, WEBM, OGG) files are allowed",
-      (files) =>
-        !files ||
-        files.every((file: File) =>
-          [
-            "image/jpeg",
-            "image/png",
-            "image/gif",
-            "video/mp4",
-            "video/webm",
-            "video/ogg",
-          ].includes(file.type)
-        )
-    ),
+  media: Yup.array().min(
+    1,
+    "At least one media file (image or video) is required"
+  ),
+  isBestSeller: Yup.boolean(),
   customizationOptions: Yup.object().when("orderType", {
     is: (val) =>
       [ORDER_TYPES.CUSTOM_ORDER, ORDER_TYPES.COMMISSION].includes(val),
@@ -136,7 +131,12 @@ const validationSchema = Yup.object({
   }),
 });
 
-const ProductModal = ({ drawerOpen, setDrawerOpen, onProductAdded }) => {
+const ProductModal = ({
+  drawerOpen,
+  setDrawerOpen,
+  onProductAdded,
+  editingProduct,
+}) => {
   const [categories, setCategories] = useState([]);
   const [subcategories, setSubcategories] = useState([]);
   const [artists, setArtists] = useState([]);
@@ -153,24 +153,30 @@ const ProductModal = ({ drawerOpen, setDrawerOpen, onProductAdded }) => {
     priceAdjustment: "",
   });
 
+  console.log("editing prodcut", editingProduct);
+
   const formik: any = useFormik({
     initialValues: {
-      name: "",
-      description: "",
-      artistId: "",
-      artistName: "",
-      price: "",
-      quantity: "",
-      categoryId: "",
-      subcategoryId: "",
-      orderType: ORDER_TYPES.READY_MADE,
-      tags: "",
-      dimensions: [],
-      materials: [],
-      weight: "",
-      media: [],
-      status: "active",
-      customizationOptions: {
+      sectionCategoryIds: editingProduct?.sectionCategoryIds || [],
+      isBestSeller: editingProduct?.isBestSeller || false,
+      name: editingProduct?.name || "",
+      description: editingProduct?.description || "",
+      artistId: editingProduct?.artistId || "",
+      artistName: editingProduct?.artistName || "",
+      price: editingProduct?.price || "",
+      slashedPrice: editingProduct?.slashedPrice || "",
+      quantity:
+        editingProduct?.quantity !== undefined ? editingProduct.quantity : "",
+      categoryId: editingProduct?.categoryId || "",
+      subcategoryId: editingProduct?.subcategoryId || "",
+      orderType: editingProduct?.orderType || ORDER_TYPES.READY_MADE,
+      tags: editingProduct?.tags?.join(", ") || "",
+      dimensions: editingProduct?.dimensions || [],
+      materials: editingProduct?.materials || [],
+      weight: editingProduct?.weight || "",
+      media: editingProduct?.images || [], // Initialize with existing images
+      status: editingProduct?.status || "active",
+      customizationOptions: editingProduct?.customizationOptions || {
         allowSizeCustomization: false,
         allowColorCustomization: false,
         allowStyleCustomization: false,
@@ -182,19 +188,27 @@ const ProductModal = ({ drawerOpen, setDrawerOpen, onProductAdded }) => {
     onSubmit: async (values) => {
       await handleAddProduct(values);
     },
+    enableReinitialize: true,
   });
 
   useEffect(() => {
     fetchCategories();
     fetchArtists();
-  }, []);
+    if (editingProduct && editingProduct.images) {
+      setMediaPreviews(editingProduct.images);
+      setMediaFiles(editingProduct.images); // Initialize mediaFiles with existing images
+    }
+  }, [editingProduct]);
 
   useEffect(() => {
     if (formik.values.categoryId) {
       fetchSubcategories(formik.values.categoryId);
-      formik.setFieldValue("subcategoryId", "");
+      formik.setFieldValue(
+        "subcategoryId",
+        editingProduct?.subcategoryId || ""
+      );
     }
-  }, [formik.values.categoryId]);
+  }, [formik.values.categoryId, editingProduct]);
 
   const fetchCategories = async () => {
     try {
@@ -242,15 +256,28 @@ const ProductModal = ({ drawerOpen, setDrawerOpen, onProductAdded }) => {
 
   const handleMediaChange = (e) => {
     const files = Array.from(e.target.files);
-    setMediaFiles(files);
-
-    const previews = files.map((file: any) => ({
+    const newPreviews = files.map((file: any) => ({
       url: URL.createObjectURL(file),
       type: file.type.startsWith("video/") ? "video" : "image",
     }));
-    setMediaPreviews(previews);
 
-    formik.setFieldValue("media", files);
+    // If editing, combine existing images with new ones, else use only new ones
+    const updatedMedia =
+      editingProduct && files.length === 0
+        ? [...(editingProduct.images || [])]
+        : [...(editingProduct?.images || []), ...files];
+
+    setMediaFiles(updatedMedia);
+    setMediaPreviews([...(editingProduct?.images || []), ...newPreviews]);
+    formik.setFieldValue("media", updatedMedia);
+  };
+
+  const removeMedia = (index) => {
+    const updatedMediaFiles = mediaFiles.filter((_, i) => i !== index);
+    const updatedPreviews = mediaPreviews.filter((_, i) => i !== index);
+    setMediaFiles(updatedMediaFiles);
+    setMediaPreviews(updatedPreviews);
+    formik.setFieldValue("media", updatedMediaFiles);
   };
 
   const addMaterial = () => {
@@ -307,7 +334,11 @@ const ProductModal = ({ drawerOpen, setDrawerOpen, onProductAdded }) => {
   };
 
   const uploadMedia = async (files) => {
-    const uploadPromises = files.map(async (file: File, index) => {
+    const uploadPromises = files.map(async (file: any, index) => {
+      // Skip if file is already a URL (existing image)
+      if (file && file.url) {
+        return file;
+      }
       const fileRef = ref(
         storage,
         `products/${Date.now()}_${index}_${file.name}`
@@ -325,23 +356,29 @@ const ProductModal = ({ drawerOpen, setDrawerOpen, onProductAdded }) => {
   const handleAddProduct = async (values) => {
     setLoading(true);
     try {
-      let mediaUrls = [];
+      let mediaUrls = editingProduct?.images || [];
       if (mediaFiles.length > 0) {
-        const imageFiles = mediaFiles.filter((file: File) =>
-          file.type.startsWith("image/")
+        const imageFiles = mediaFiles.filter(
+          (file: any) => file && file.type && file.type.startsWith("image/")
         );
-        const videoFiles = mediaFiles.filter((file: File) =>
-          file.type.startsWith("video/")
+        const videoFiles = mediaFiles.filter(
+          (file: any) => file && file.type && file.type.startsWith("video/")
         );
+        const existingUrls = mediaFiles.filter((file: any) => file && file.url);
 
-        const cloudinaryUrls = imageFiles.length
-          ? await uploadImagesToCloudinary(imageFiles)
-          : [];
+        let cloudinaryUrls = [];
+        if (imageFiles.length > 0) {
+          const uploadResult = await uploadImagesToCloudinary(imageFiles);
+          cloudinaryUrls = Array.isArray(uploadResult)
+            ? uploadResult
+            : [uploadResult];
+        }
         const firebaseVideoUrls = videoFiles.length
           ? await uploadMedia(videoFiles)
           : [];
 
         mediaUrls = [
+          ...existingUrls,
           ...cloudinaryUrls.map((url) => ({ url, type: "image" })),
           ...firebaseVideoUrls,
         ];
@@ -350,9 +387,13 @@ const ProductModal = ({ drawerOpen, setDrawerOpen, onProductAdded }) => {
       const selectedArtist = artists.find(
         (artist) => artist.id === values.artistId
       );
+      const selectedCategory = categories.find(
+        (category) => category.id === values.categoryId
+      );
       const productData = {
         ...values,
         price: Number(values.price),
+        slashedPrice: values.slashedPrice ? Number(values.slashedPrice) : null,
         quantity:
           values.orderType === ORDER_TYPES.READY_MADE
             ? Number(values.quantity)
@@ -363,7 +404,8 @@ const ProductModal = ({ drawerOpen, setDrawerOpen, onProductAdded }) => {
           : [],
         images: mediaUrls,
         artistName: selectedArtist ? selectedArtist.name : "",
-        createdAt: new Date(),
+        categoryName: selectedCategory?.name,
+        createdAt: editingProduct ? editingProduct.createdAt : new Date(),
         updatedAt: new Date(),
         isCustomizable: [
           ORDER_TYPES.CUSTOM_ORDER,
@@ -391,9 +433,19 @@ const ProductModal = ({ drawerOpen, setDrawerOpen, onProductAdded }) => {
 
       delete productData.media;
 
-      const docRef = await addDoc(collection(db, "products"), productData);
+      let docRef;
+      if (editingProduct) {
+        docRef = doc(db, "products", editingProduct.id);
+        await updateDoc(docRef, productData);
+      } else {
+        docRef = await addDoc(collection(db, "products"), productData);
+      }
 
-      toast.success("Product added successfully!");
+      toast.success(
+        editingProduct
+          ? "Product updated successfully!"
+          : "Product added successfully!"
+      );
 
       formik.resetForm();
       setMediaFiles([]);
@@ -410,16 +462,24 @@ const ProductModal = ({ drawerOpen, setDrawerOpen, onProductAdded }) => {
       setDrawerOpen(false);
 
       if (onProductAdded) {
-        onProductAdded({ id: docRef.id, ...productData });
+        onProductAdded({
+          id: editingProduct ? editingProduct.id : docRef.id,
+          ...productData,
+        });
       }
     } catch (error) {
-      console.error("Error adding product:", error);
-      toast.error("Failed to add product. Please try again.");
+      console.error("Error processing product:", error);
+      toast.error(
+        editingProduct
+          ? "Failed to update product. Please try again."
+          : "Failed to add product. Please try again."
+      );
     } finally {
       setLoading(false);
     }
   };
 
+  console.log("formik", formik.errors);
   const handleCancel = () => {
     formik.resetForm();
     setMediaFiles([]);
@@ -443,7 +503,7 @@ const ProductModal = ({ drawerOpen, setDrawerOpen, onProductAdded }) => {
 
   return (
     <MasterDrawer
-      title="Add New Product"
+      title={editingProduct ? "Edit Product" : "Add New Product"}
       isOpen={drawerOpen}
       onOpenChange={setDrawerOpen}
       size="full"
@@ -457,7 +517,11 @@ const ProductModal = ({ drawerOpen, setDrawerOpen, onProductAdded }) => {
             onClick={formik.handleSubmit}
             disabled={loading || !formik.isValid}
           >
-            {loading ? "Saving..." : "Save Product"}
+            {loading
+              ? "Saving..."
+              : editingProduct
+              ? "Update Product"
+              : "Save Product"}
           </Button>
         </div>
       }
@@ -531,6 +595,16 @@ const ProductModal = ({ drawerOpen, setDrawerOpen, onProductAdded }) => {
                   {formik.errors.artistId}
                 </p>
               )}
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Label>Best Seller</Label>
+              <Switch
+                checked={formik.values.isBestSeller}
+                onCheckedChange={(val) =>
+                  formik.setFieldValue("isBestSeller", Boolean(val))
+                }
+              />
             </div>
 
             <div>
@@ -683,6 +757,80 @@ const ProductModal = ({ drawerOpen, setDrawerOpen, onProductAdded }) => {
           </CardContent>
         </Card>
 
+        {/* Sections (multi-select for categories with isSection = true) */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Sections</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div>
+              <Label>Sections (choose one or more)</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full text-left">
+                    {formik.values.sectionCategoryIds &&
+                    formik.values.sectionCategoryIds.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {formik.values.sectionCategoryIds.map((id) => {
+                          const cat = categories.find((c) => c.id === id);
+                          return (
+                            <Badge key={id} variant="secondary">
+                              {cat ? cat.name : id}
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">
+                        Select sections
+                      </span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {categories
+                      .filter((c) => c.isSection)
+                      .map((category) => {
+                        const checked =
+                          formik.values.sectionCategoryIds.includes(
+                            category.id
+                          );
+                        return (
+                          <label
+                            key={category.id}
+                            className="flex items-center gap-2 cursor-pointer"
+                          >
+                            <Checkbox
+                              checked={checked}
+                              onCheckedChange={(val) => {
+                                const next = new Set(
+                                  formik.values.sectionCategoryIds || []
+                                );
+                                if (val) next.add(category.id);
+                                else next.delete(category.id);
+                                formik.setFieldValue(
+                                  "sectionCategoryIds",
+                                  Array.from(next)
+                                );
+                              }}
+                            />
+                            <span>{category.name}</span>
+                          </label>
+                        );
+                      })}
+                    {categories.filter((c) => c.isSection).length === 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        No sections available
+                      </p>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Pricing & Inventory */}
         <Card>
           <CardHeader>
@@ -713,7 +861,29 @@ const ProductModal = ({ drawerOpen, setDrawerOpen, onProductAdded }) => {
                   </p>
                 )}
               </div>
-
+              <div>
+                <Label htmlFor="slashedPrice">Slashed Price ($)</Label>
+                <Input
+                  id="slashedPrice"
+                  name="slashedPrice"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={formik.values.slashedPrice}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
+                  className={
+                    formik.touched.slashedPrice && formik.errors.slashedPrice
+                      ? "border-red-500"
+                      : ""
+                  }
+                />
+                {formik.touched.slashedPrice && formik.errors.slashedPrice && (
+                  <p className="text-red-500 text-sm mt-1">
+                    {formik.errors.slashedPrice}
+                  </p>
+                )}
+              </div>
               {formik.values.orderType === ORDER_TYPES.READY_MADE && (
                 <div>
                   <Label htmlFor="quantity">Quantity *</Label>
@@ -738,7 +908,6 @@ const ProductModal = ({ drawerOpen, setDrawerOpen, onProductAdded }) => {
                   )}
                 </div>
               )}
-
               <div>
                 <Label htmlFor="weight">Weight (kg)</Label>
                 <Input
@@ -1110,6 +1279,15 @@ const ProductModal = ({ drawerOpen, setDrawerOpen, onProductAdded }) => {
                         className="w-full h-32 object-cover rounded-lg border"
                       />
                     )}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute top-1 right-1 bg-gray-800 bg-opacity-50"
+                      onClick={() => removeMedia(index)}
+                    >
+                      <X className="h-4 w-4 text-white" />
+                    </Button>
                   </div>
                 ))}
               </div>

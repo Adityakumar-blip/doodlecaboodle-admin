@@ -28,6 +28,9 @@ import {
   TicketPercent,
   LogOut,
   Menu,
+  Image,
+  ShieldQuestion,
+  RemoveFormatting,
 } from "lucide-react";
 
 interface MainSidebarProps {
@@ -87,7 +90,15 @@ const MainSidebar = ({
       showTo: isAdmin,
       badge: unreadCount > 0 ? unreadCount : undefined,
     },
+
     { to: "/users", label: "Users", icon: Users2, showTo: true },
+    { to: "/banner", label: "Banners", icon: Image, showTo: true },
+    {
+      to: "/faq-manager",
+      label: "FAQ Manager",
+      icon: ShieldQuestion,
+      showTo: true,
+    },
     { to: "/artists", label: "Artists", icon: Users, showTo: true },
     {
       to: "/product-categories",
@@ -115,6 +126,7 @@ const MainSidebar = ({
     },
     { to: "/orders", label: "Orders", icon: ShoppingCart, showTo: true },
     { to: "/coupons", label: "Coupons", icon: TicketPercent, showTo: true },
+    { to: "/reviews", label: "Reviews", icon: RemoveFormatting, showTo: true },
   ];
 
   return (

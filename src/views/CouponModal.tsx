@@ -8,6 +8,7 @@ import {
   updateDoc,
   doc,
   getFirestore,
+  getDocs,
 } from "firebase/firestore";
 import { toast } from "sonner";
 import { MasterDrawer } from "@/components/MasterDrawer";
@@ -26,6 +27,12 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 const db = getFirestore();
 
+interface Category {
+  id: string;
+  name: string;
+  [key: string]: any;
+}
+
 const validationSchema = Yup.object({
   code: Yup.string()
     .min(3, "Coupon code must be at least 3 characters")
@@ -36,6 +43,7 @@ const validationSchema = Yup.object({
   type: Yup.string()
     .oneOf(["delivery", "packaging", "other"], "Invalid coupon type")
     .required("Coupon type is required"),
+  categoryId: Yup.string().nullable(),
   discountValue: Yup.number().when("type", {
     is: "other",
     then: (schema) =>
@@ -77,12 +85,15 @@ const CouponModal: React.FC<CouponModalProps> = ({
   selectedCoupon,
 }) => {
   const [loading, setLoading] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
 
   const formik: any = useFormik({
     initialValues: {
       code: "",
       description: "",
       type: "delivery",
+      categoryIds: "",
       discountValue: null,
       discountType: "percentage",
       validFrom: new Date().toISOString().split("T")[0],
@@ -95,12 +106,36 @@ const CouponModal: React.FC<CouponModalProps> = ({
     },
   });
 
+  const fetchCategories = async () => {
+    setLoadingCategories(true);
+    try {
+      const querySnapshot = await getDocs(collection(db, "productCategories"));
+      const fetchedCategories = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Category[];
+      setCategories(fetchedCategories);
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+      toast.error("Failed to fetch categories");
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
+
+  useEffect(() => {
+    if (drawerOpen) {
+      fetchCategories();
+    }
+  }, [drawerOpen]);
+
   useEffect(() => {
     if (selectedCoupon) {
       formik.setValues({
         code: selectedCoupon.code || "",
         description: selectedCoupon.description || "",
         type: selectedCoupon.type || "delivery",
+        categoryIds: selectedCoupon.categoryIds || "",
         discountValue: selectedCoupon.discountValue || null,
         discountType: selectedCoupon.discountType || "percentage",
         validFrom: selectedCoupon.validFrom
@@ -123,6 +158,7 @@ const CouponModal: React.FC<CouponModalProps> = ({
         code: values.code,
         description: values.description,
         type: values.type,
+        categoryIds: values.categoryIds || null,
         discountValue: values.type === "other" ? values.discountValue : null,
         discountType: values.type === "other" ? values.discountType : null,
         validFrom: new Date(values.validFrom),
@@ -244,10 +280,10 @@ const CouponModal: React.FC<CouponModalProps> = ({
           </CardContent>
         </Card>
 
-        {/* Coupon Type and Discount */}
+        {/* Coupon Type and Category */}
         <Card>
           <CardHeader>
-            <CardTitle>Coupon Type</CardTitle>
+            <CardTitle>Coupon Type & Category</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
@@ -280,6 +316,121 @@ const CouponModal: React.FC<CouponModalProps> = ({
               {formik.touched.type && formik.errors.type && (
                 <p className="text-red-500 text-sm mt-1">
                   {formik.errors.type}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="categoryIds">Categories (Optional)</Label>
+              <div className="space-y-2">
+                <div className="text-sm text-gray-600 mb-2">
+                  Selected:{" "}
+                  {(formik.values.categoryIds || []).length > 0
+                    ? categories
+                        .filter((cat) =>
+                          (formik.values.categoryIds || []).includes(cat.id)
+                        )
+                        .map((cat) => cat.name)
+                        .join(", ")
+                    : "None"}
+                </div>
+                <Select
+                  onValueChange={(value) => {
+                    const currentCategories = formik.values.categoryIds || [];
+                    if (value && !currentCategories.includes(value)) {
+                      formik.setFieldValue("categoryIds", [
+                        ...currentCategories,
+                        value,
+                      ]);
+                    }
+                  }}
+                >
+                  <SelectTrigger
+                    className={
+                      formik.touched.categoryIds && formik.errors.categoryIds
+                        ? "border-red-500"
+                        : ""
+                    }
+                  >
+                    <SelectValue
+                      placeholder={
+                        loadingCategories
+                          ? "Loading categories..."
+                          : "Add categories"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories
+                      .filter(
+                        (category) =>
+                          !(formik.values.categoryIds || []).includes(
+                            category.id
+                          )
+                      )
+                      .map((category) => (
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    {categories.filter(
+                      (category) =>
+                        !(formik.values.categoryIds || []).includes(category.id)
+                    ).length === 0 && (
+                      <div className="p-2 text-sm text-gray-500">
+                        All categories selected
+                      </div>
+                    )}
+                  </SelectContent>
+                </Select>
+
+                {/* Selected Categories Display with Remove Option */}
+                {(formik.values.categoryIds || []).length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {(formik.values.categoryIds || []).map(
+                      (categoryId: string) => {
+                        const category = categories.find(
+                          (cat) => cat.id === categoryId
+                        );
+                        return category ? (
+                          <div
+                            key={categoryId}
+                            className="flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-1 rounded-md text-sm"
+                          >
+                            <span>{category.name}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const currentCategories =
+                                  formik.values.categoryIds || [];
+                                formik.setFieldValue(
+                                  "categoryIds",
+                                  currentCategories.filter(
+                                    (id: string) => id !== categoryId
+                                  )
+                                );
+                              }}
+                              className="ml-1 text-blue-600 hover:text-blue-800"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ) : null;
+                      }
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => formik.setFieldValue("categoryIds", [])}
+                      className="text-xs text-red-600 hover:text-red-800 underline"
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                )}
+              </div>
+              {formik.touched.categoryIds && formik.errors.categoryIds && (
+                <p className="text-red-500 text-sm mt-1">
+                  {formik.errors.categoryIds}
                 </p>
               )}
             </div>

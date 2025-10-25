@@ -32,6 +32,10 @@ import Collections from "./pages/Collections";
 import Artists from "./pages/Artists";
 import WorkList from "./pages/Works";
 import Coupons from "./pages/Coupons";
+import BannerDisplay from "./pages/BannerDisplay";
+import FAQDisplay from "./pages/FAQDisplay";
+import OrdersDisplay from "./pages/OrderDisplay";
+import ReviewsDisplay from "./pages/ReviewsDisplay";
 
 const queryClient = new QueryClient();
 
@@ -70,6 +74,38 @@ const App = () => (
                 element={
                   <AdminLayoutWrapper>
                     <Dashboard />
+                  </AdminLayoutWrapper>
+                }
+              />
+              <Route
+                path="/banner"
+                element={
+                  <AdminLayoutWrapper>
+                    <BannerDisplay />
+                  </AdminLayoutWrapper>
+                } 
+              />
+              <Route
+                path="/reviews"
+                element={
+                  <AdminLayoutWrapper>
+                    <ReviewsDisplay />
+                  </AdminLayoutWrapper>
+                }
+              />
+              <Route
+                path="/orders"
+                element={
+                  <AdminLayoutWrapper>
+                    <OrdersDisplay />
+                  </AdminLayoutWrapper>
+                }
+              />
+              <Route
+                path="/faq-manager"
+                element={
+                  <AdminLayoutWrapper>
+                    <FAQDisplay />
                   </AdminLayoutWrapper>
                 }
               />
