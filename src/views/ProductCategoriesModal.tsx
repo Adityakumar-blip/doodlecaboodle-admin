@@ -70,8 +70,11 @@ const ProductCategoriesModal = ({
   const [newSubcategory, setNewSubcategory] = useState("");
   const [bannerFile, setBannerFile] = useState(null);
   const [bannerPreview, setBannerPreview] = useState("");
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState("");
   const [uploading, setUploading] = useState(false);
   const bannerInputRef = useRef(null);
+  const imageInputRef = useRef(null);
 
   // Mock existing categories - replace with your actual data source
   const existingCategories = [
@@ -124,6 +127,7 @@ const ProductCategoriesModal = ({
         setSubmitting(true);
 
         let bannerUrl = values.bannerUrl;
+        let imageUrl = values.imageUrl;
 
         // Upload banner to Cloudinary if a new file is selected
         if (bannerFile) {
@@ -137,9 +141,22 @@ const ProductCategoriesModal = ({
           }
         }
 
+        // Upload category image to Cloudinary if a new file is selected
+        if (imageFile) {
+          setUploading(true);
+          try {
+            imageUrl = await uploadImagesToCloudinary(imageFile);
+          } catch (error) {
+            throw new Error("Failed to upload category image to Cloudinary");
+          } finally {
+            setUploading(false);
+          }
+        }
+
         const categoryData = {
           ...values,
           bannerUrl,
+          imageUrl,
           updatedAt: new Date(),
         };
 
@@ -173,6 +190,8 @@ const ProductCategoriesModal = ({
         resetForm();
         setBannerFile(null);
         setBannerPreview("");
+        setImageFile(null);
+        setImagePreview("");
         setDrawerOpen(false);
         if (onSaveSuccess) onSaveSuccess();
       } catch (error) {
@@ -195,6 +214,9 @@ const ProductCategoriesModal = ({
   useEffect(() => {
     if (mode === "edit" && selectedCategory?.bannerUrl) {
       setBannerPreview(selectedCategory.bannerUrl);
+    }
+    if (mode === "edit" && selectedCategory?.imageUrl) {
+      setImagePreview(selectedCategory.imageUrl);
     }
   }, [mode, selectedCategory]);
 
@@ -249,6 +271,33 @@ const ProductCategoriesModal = ({
       const reader = new FileReader();
       reader.onload = (e: any) => {
         setBannerPreview(e.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Handle category image file selection
+  const handleImageFileSelect = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      if (!file.type.startsWith("image/")) {
+        alert("Please select a valid image file");
+        return;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        console.log(
+          `File size is ${(file.size / (1024 * 1024)).toFixed(
+            2
+          )}MB, will attempt compression during upload`
+        );
+      }
+
+      setImageFile(file);
+
+      const reader = new FileReader();
+      reader.onload = (e: any) => {
+        setImagePreview(e.target.result);
       };
       reader.readAsDataURL(file);
     }
@@ -617,56 +666,60 @@ const ProductCategoriesModal = ({
                   )}
                 </div>
               )}
-
-              <div className="space-y-2">
-                <Label htmlFor="bannerUrl">Or Banner URL</Label>
-                <Input
-                  id="bannerUrl"
-                  name="bannerUrl"
-                  value={formik.values.bannerUrl}
-                  onChange={(e) => {
-                    formik.handleChange(e);
-                    if (e.target.value) {
-                      setBannerPreview(e.target.value);
-                      setBannerFile(null);
-                    }
-                  }}
-                  onBlur={formik.handleBlur}
-                  placeholder="https://example.com/banner-image.jpg"
-                  className={
-                    formik.errors.bannerUrl && formik.touched.bannerUrl
-                      ? "border-red-500"
-                      : ""
-                  }
-                  disabled={mode === "view"}
-                />
-                {formik.errors.bannerUrl && formik.touched.bannerUrl && (
-                  <div className="text-red-500 text-sm">
-                    {formik.errors.bannerUrl}
-                  </div>
-                )}
-              </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="imageUrl">Category Image URL</Label>
-              <Input
-                id="imageUrl"
-                name="imageUrl"
-                value={formik.values.imageUrl}
-                onChange={formik.handleChange}
-                onBlur={formik.handleBlur}
-                placeholder="https://example.com/category-image.jpg"
-                className={
-                  formik.errors.imageUrl && formik.touched.imageUrl
-                    ? "border-red-500"
-                    : ""
-                }
-                disabled={mode === "view"}
-              />
+              <Label htmlFor="imageUrl">Category Image</Label>
+              <div className="space-y-2">
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageFileSelect}
+                  className="hidden"
+                />
+                {mode !== "view" && (
+                  <div className="space-y-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => imageInputRef.current?.click()}
+                      disabled={uploading}
+                      className="w-full"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      {uploading ? "Uploading..." : "Upload Category Image"}
+                    </Button>
+                  </div>
+                )}
+              </div>
               {formik.errors.imageUrl && formik.touched.imageUrl && (
                 <div className="text-red-500 text-sm">
                   {formik.errors.imageUrl}
+                </div>
+              )}
+              {imagePreview && (
+                <div className="relative mt-2">
+                  <img
+                    src={imagePreview}
+                    alt="Category preview"
+                    className="w-32 h-32 object-cover rounded-lg border"
+                  />
+                  {mode !== "view" && (
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      className="absolute top-1 right-1"
+                      onClick={() => {
+                        setImagePreview("");
+                        setImageFile(null);
+                        formik.setFieldValue("imageUrl", "");
+                      }}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  )}
                 </div>
               )}
             </div>
@@ -999,6 +1052,8 @@ const ProductCategoriesModal = ({
               setDrawerOpen(false);
               setBannerFile(null);
               setBannerPreview("");
+              setImageFile(null);
+              setImagePreview("");
             }}
             disabled={formik.isSubmitting || uploading}
           >
