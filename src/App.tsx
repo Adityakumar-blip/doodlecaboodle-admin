@@ -36,6 +36,7 @@ import BannerDisplay from "./pages/BannerDisplay";
 import FAQDisplay from "./pages/FAQDisplay";
 import OrdersDisplay from "./pages/OrderDisplay";
 import ReviewsDisplay from "./pages/ReviewsDisplay";
+import FilterDisplay from "./pages/FilterDisplay";
 
 const queryClient = new QueryClient();
 
@@ -83,7 +84,7 @@ const App = () => (
                   <AdminLayoutWrapper>
                     <BannerDisplay />
                   </AdminLayoutWrapper>
-                } 
+                }
               />
               <Route
                 path="/reviews"
@@ -157,6 +158,15 @@ const App = () => (
                 element={
                   <AdminLayoutWrapper>
                     <Coupons />
+                  </AdminLayoutWrapper>
+                }
+              />
+
+              <Route
+                path="/filters"
+                element={
+                  <AdminLayoutWrapper>
+                    <FilterDisplay />
                   </AdminLayoutWrapper>
                 }
               />

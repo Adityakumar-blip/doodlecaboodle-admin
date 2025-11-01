@@ -31,6 +31,7 @@ import {
   Image,
   ShieldQuestion,
   RemoveFormatting,
+  Filter,
 } from "lucide-react";
 
 interface MainSidebarProps {
@@ -126,6 +127,7 @@ const MainSidebar = ({
     },
     { to: "/orders", label: "Orders", icon: ShoppingCart, showTo: true },
     { to: "/coupons", label: "Coupons", icon: TicketPercent, showTo: true },
+    { to: "/filters", label: "Filters", icon: Filter, showTo: true },
     { to: "/reviews", label: "Reviews", icon: RemoveFormatting, showTo: true },
   ];
 
