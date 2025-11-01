@@ -106,12 +106,12 @@ const BannerModal = ({
 
       if (desktopFile) {
         const uploadResult = await uploadImagesToCloudinary([desktopFile]);
-        desktopUrl = uploadResult[0]; // first uploaded url
+        desktopUrl = uploadResult; // first uploaded url
       }
 
       if (mobileFile) {
         const uploadResult = await uploadImagesToCloudinary([mobileFile]);
-        mobileUrl = uploadResult[0]; // first uploaded url
+        mobileUrl = uploadResult; // first uploaded url
       }
 
       const bannerData = {
