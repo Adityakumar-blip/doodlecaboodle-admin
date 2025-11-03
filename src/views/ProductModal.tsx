@@ -184,7 +184,7 @@ const ProductModal = ({
         deliveryTimeframe: "",
       },
     },
-    validationSchema,
+    // validationSchema,
     onSubmit: async (values) => {
       await handleAddProduct(values);
     },
