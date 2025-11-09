@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,7 +17,23 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Edit, Trash2, Eye, EyeOff, GripVertical, Save, X } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Edit,
+  Trash2,
+  Eye,
+  EyeOff,
+  GripVertical,
+  Save,
+  X,
+  Filter,
+} from "lucide-react";
 import ProductModal from "@/views/ProductModal";
 import {
   collection,
@@ -84,6 +100,7 @@ export default function ProductList() {
   const [isReorderMode, setIsReorderMode] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -127,7 +144,7 @@ export default function ProductList() {
       await deleteDoc(doc(db, "products", productId));
       setProducts((prev) => prev.filter((product) => product.id !== productId));
       setOriginalProducts((prev) =>
-        prev.filter((product) => product.id !== productId)
+        prev.filter((product) => product.id !== productId),
       );
       toast.success("Product deleted successfully");
     } catch (error) {
@@ -138,7 +155,7 @@ export default function ProductList() {
 
   const handleStatusToggle = async (
     productId: string,
-    currentStatus: string
+    currentStatus: string,
   ) => {
     const newStatus = currentStatus === "active" ? "inactive" : "active";
 
@@ -152,14 +169,14 @@ export default function ProductList() {
         prev.map((product) =>
           product.id === productId
             ? { ...product, status: newStatus as "active" | "inactive" }
-            : product
-        )
+            : product,
+        ),
       );
 
       toast.success(
         `Product ${
           newStatus === "active" ? "activated" : "deactivated"
-        } successfully`
+        } successfully`,
       );
     } catch (error) {
       console.error("Error updating product status:", error);
@@ -173,13 +190,13 @@ export default function ProductList() {
       const updatedProduct = { ...newProduct, id: editingProduct.id };
       setProducts((prev) =>
         prev.map((product) =>
-          product.id === editingProduct.id ? updatedProduct : product
-        )
+          product.id === editingProduct.id ? updatedProduct : product,
+        ),
       );
       setOriginalProducts((prev) =>
         prev.map((product) =>
-          product.id === editingProduct.id ? updatedProduct : product
-        )
+          product.id === editingProduct.id ? updatedProduct : product,
+        ),
       );
       toast.success("Product updated successfully");
     } else {
@@ -266,6 +283,25 @@ export default function ProductList() {
     }
     setIsReorderMode(false);
   };
+
+  // Get unique categories for filter
+  const uniqueCategories = useMemo(() => {
+    const categories = new Set(
+      products.map((p) => p.categoryName || p.category).filter(Boolean),
+    );
+    return Array.from(categories).sort();
+  }, [products]);
+
+  // Filter products based on selected category
+  const filteredProducts = useMemo(() => {
+    if (selectedCategory === "all") {
+      return products;
+    }
+    return products.filter(
+      (p) =>
+        p.categoryName === selectedCategory || p.category === selectedCategory,
+    );
+  }, [products, selectedCategory]);
 
   // Sortable Item Component for Reorder Mode
   const SortableItem: React.FC<{ product: Product; index: number }> = ({
@@ -485,7 +521,7 @@ export default function ProductList() {
   const getStatusCounts = () => {
     const activeCount = products.filter((p) => p.status === "active").length;
     const inactiveCount = products.filter(
-      (p) => p.status === "inactive"
+      (p) => p.status === "inactive",
     ).length;
     const lowStockCount = products.filter((p) => p.quantity <= 10).length;
 
@@ -556,6 +592,35 @@ export default function ProductList() {
         </div>
       </div>
 
+      {!isReorderMode && (
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-gray-500" />
+            <span className="text-sm font-medium text-gray-700">
+              Filter by Category:
+            </span>
+          </div>
+          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Select category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              {uniqueCategories.map((category) => (
+                <SelectItem key={category} value={category}>
+                  {category}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {selectedCategory !== "all" && (
+            <Badge variant="outline" className="text-xs">
+              Showing: {filteredProducts.length} of {products.length}
+            </Badge>
+          )}
+        </div>
+      )}
+
       {isReorderMode && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="flex items-center justify-between">
@@ -583,7 +648,7 @@ export default function ProductList() {
         <ReorderList />
       ) : (
         <DataTable
-          data={products}
+          data={filteredProducts}
           columns={columns}
           keyExtractor={(item) => item.id}
           searchable
