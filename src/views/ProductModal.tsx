@@ -36,6 +36,13 @@ import {
 import { ref, uploadBytes, getDownloadURL, getStorage } from "firebase/storage";
 import { toast } from "sonner";
 import { uploadImagesToCloudinary } from "@/services/CloudinaryUpload";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import MultiSelect from "@/components/MultipleSelect";
 
 const db = getFirestore();
 const storage = getStorage();
@@ -142,8 +149,20 @@ const ProductModal = ({
   const [artists, setArtists] = useState([]);
   const [loading, setLoading] = useState(false);
   const [mediaFiles, setMediaFiles] = useState([]);
+  const [bannerFiles, setBannerFiles] = useState([]);
   const [mediaPreviews, setMediaPreviews] = useState([]);
+  const [mediaPreviews1, setMediaPreviews1] = useState([]);
+  const [variantMediaFiles, setVariantMediaFiles] = useState<
+    Record<string, any[]>
+  >({});
+  const [variantPreviews, setVariantPreviews] = useState<Record<string, any[]>>(
+    {}
+  );
+
   const [newMaterial, setNewMaterial] = useState("");
+  const [newDescRow, setNewDescRow] = useState({ field: "", value: "" });
+  const [allProducts, setAllProducts] = useState<any[]>([]);
+
   const [newDimension, setNewDimension] = useState({
     name: "",
     length: "",
@@ -152,8 +171,6 @@ const ProductModal = ({
     unit: "cm",
     priceAdjustment: "",
   });
-
-  console.log("editing prodcut", editingProduct);
 
   const formik: any = useFormik({
     initialValues: {
@@ -176,6 +193,10 @@ const ProductModal = ({
       weight: editingProduct?.weight || "",
       media: editingProduct?.images || [], // Initialize with existing images
       status: editingProduct?.status || "active",
+      descriptionFields: editingProduct?.descriptionFields || [],
+      relatedProducts: editingProduct?.relatedProducts || [],
+      variants: editingProduct?.variants || [],
+      banners: editingProduct?.banners || [],
       customizationOptions: editingProduct?.customizationOptions || {
         allowSizeCustomization: false,
         allowColorCustomization: false,
@@ -191,14 +212,33 @@ const ProductModal = ({
     enableReinitialize: true,
   });
 
+  const fetchAllProducts = async () => {
+    const snap = await getDocs(collection(db, "products"));
+    let items = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
+    if (editingProduct?.id) {
+      items = items.filter((p) => p.id !== editingProduct.id);
+    }
+    setAllProducts(items);
+  };
+
   useEffect(() => {
     fetchCategories();
     fetchArtists();
+    fetchAllProducts();
     if (editingProduct && editingProduct.images) {
       setMediaPreviews(editingProduct.images);
       setMediaFiles(editingProduct.images); // Initialize mediaFiles with existing images
     }
+    if (editingProduct?.banners) {
+      setMediaPreviews1(editingProduct.banners);
+      setBannerFiles(editingProduct.banners);
+    }
   }, [editingProduct]);
+
+  const productOptions = React.useMemo(
+    () => allProducts.map((p) => ({ value: p.id, label: p.name })),
+    [allProducts]
+  );
 
   useEffect(() => {
     if (formik.values.categoryId) {
@@ -209,6 +249,81 @@ const ProductModal = ({
       );
     }
   }, [formik.values.categoryId, editingProduct]);
+
+  const addVariant = () => {
+    const id = crypto.randomUUID();
+    formik.setFieldValue("variants", [
+      ...formik.values.variants,
+      {
+        id,
+        colorName: "",
+        colorHex: "#000000",
+        sku: "",
+        priceAdjustment: "",
+        quantity:
+          formik.values.orderType === ORDER_TYPES.READY_MADE ? "" : null,
+        images: [],
+        isDefault: formik.values.variants.length === 0, // first added -> default
+      },
+    ]);
+  };
+
+  const removeVariant = (id: string) => {
+    formik.setFieldValue(
+      "variants",
+      formik.values.variants.filter((v) => v.id !== id)
+    );
+    setVariantMediaFiles((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setVariantPreviews((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  };
+
+  const setDefaultVariant = (id: string) => {
+    const next = formik.values.variants.map((v) => ({
+      ...v,
+      isDefault: v.id === id,
+    }));
+    formik.setFieldValue("variants", next);
+  };
+
+  const handleVariantMediaChange = (
+    variantId: string,
+    filesList: FileList | null
+  ) => {
+    const files = filesList ? Array.from(filesList) : [];
+    const previews = files.map((file: any) => ({
+      url: URL.createObjectURL(file),
+      type: file.type.startsWith("video/") ? "video" : "image",
+    }));
+    setVariantMediaFiles((prev) => ({
+      ...prev,
+      [variantId]: [...(prev[variantId] || []), ...files],
+    }));
+    setVariantPreviews((prev) => ({
+      ...prev,
+      [variantId]: [...(prev[variantId] || []), ...previews],
+    }));
+  };
+
+  const removeVariantMedia = (variantId: string, index: number) => {
+    setVariantMediaFiles((prev) => {
+      const next = { ...(prev || {}) };
+      next[variantId] = (next[variantId] || []).filter((_, i) => i !== index);
+      return next;
+    });
+    setVariantPreviews((prev) => {
+      const next = { ...(prev || {}) };
+      next[variantId] = (next[variantId] || []).filter((_, i) => i !== index);
+      return next;
+    });
+  };
 
   const fetchCategories = async () => {
     try {
@@ -272,12 +387,38 @@ const ProductModal = ({
     formik.setFieldValue("media", updatedMedia);
   };
 
+  const handleBannerChange = (e) => {
+    const files = Array.from(e.target.files);
+    const newPreviews = files.map((file: any) => ({
+      url: URL.createObjectURL(file),
+      type: file.type.startsWith("video/") ? "video" : "image",
+    }));
+
+    const current = Array.isArray(formik.values.banners)
+      ? formik.values.banners
+      : [];
+
+    const updated = [...current, ...files];
+
+    setBannerFiles(updated);
+    setMediaPreviews1([...(current || []), ...newPreviews]);
+    formik.setFieldValue("banners", updated);
+  };
+
   const removeMedia = (index) => {
     const updatedMediaFiles = mediaFiles.filter((_, i) => i !== index);
     const updatedPreviews = mediaPreviews.filter((_, i) => i !== index);
     setMediaFiles(updatedMediaFiles);
     setMediaPreviews(updatedPreviews);
     formik.setFieldValue("media", updatedMediaFiles);
+  };
+
+  const removeBanner = (index) => {
+    const updatedBannerFiles = bannerFiles.filter((_, i) => i !== index);
+    const updatedPreviews = mediaPreviews1.filter((_, i) => i !== index);
+    setBannerFiles(updatedBannerFiles);
+    setMediaPreviews1(updatedPreviews);
+    formik.setFieldValue("banners", updatedBannerFiles);
   };
 
   const addMaterial = () => {
@@ -384,6 +525,87 @@ const ProductModal = ({
         ];
       }
 
+      let bannerUrls = editingProduct?.banners || [];
+      if (bannerFiles.length > 0) {
+        const bannerImageFiles = bannerFiles.filter(
+          (file) => file && file.type && file.type.startsWith("image/")
+        );
+        const bannerVideoFiles = bannerFiles.filter(
+          (file) => file && file.type && file.type.startsWith("video/")
+        );
+        const existingBannerUrls = bannerFiles.filter(
+          (file) => file && file.url
+        );
+
+        let bannerCloudinaryUrls = [];
+        if (bannerImageFiles.length > 0) {
+          const bannerUploadResult = await uploadImagesToCloudinary(
+            bannerImageFiles
+          );
+          bannerCloudinaryUrls = Array.isArray(bannerUploadResult)
+            ? bannerUploadResult
+            : [bannerUploadResult];
+        }
+
+        const firebaseBannerVideoUrls = bannerVideoFiles.length
+          ? await uploadMedia(bannerVideoFiles)
+          : [];
+
+        bannerUrls = [
+          ...existingBannerUrls,
+          ...bannerCloudinaryUrls.map((url) => ({ url, type: "image" })),
+          ...firebaseBannerVideoUrls,
+        ];
+      }
+
+      const uploadedVariantMedia: Record<
+        string,
+        { url: string; type: "image" | "video" }[]
+      > = {};
+
+      for (const v of values.variants || []) {
+        const files = variantMediaFiles[v.id] || [];
+        if (files.length === 0) {
+          uploadedVariantMedia[v.id] = v.images || [];
+          continue;
+        }
+        const imageFiles = files.filter((f: any) =>
+          f.type?.startsWith("image/")
+        );
+        const videoFiles = files.filter((f: any) =>
+          f.type?.startsWith("video/")
+        );
+        const existingUrls = (v.images || []).filter((m: any) => m && m.url);
+
+        let cloudinaryUrls: string[] = [];
+        if (imageFiles.length > 0) {
+          const up = await uploadImagesToCloudinary(imageFiles);
+          cloudinaryUrls = Array.isArray(up) ? up : [up];
+        }
+        const firebaseVideoUrls = videoFiles.length
+          ? await uploadMedia(videoFiles)
+          : [];
+
+        uploadedVariantMedia[v.id] = [
+          ...existingUrls,
+          ...cloudinaryUrls.map((url) => ({ url, type: "image" as const })),
+          ...firebaseVideoUrls,
+        ];
+      }
+
+      const normalizedVariants = (values.variants || []).map((v) => ({
+        ...v,
+        sku: v.sku || null,
+        priceAdjustment: v.priceAdjustment ? Number(v.priceAdjustment) : 0,
+        quantity:
+          values.orderType === ORDER_TYPES.READY_MADE
+            ? v.quantity === "" || v.quantity == null
+              ? 0
+              : Number(v.quantity)
+            : null,
+        images: uploadedVariantMedia[v.id] || v.images || [],
+      }));
+
       const selectedArtist = artists.find(
         (artist) => artist.id === values.artistId
       );
@@ -403,6 +625,9 @@ const ProductModal = ({
           ? values.tags.split(",").map((tag) => tag.trim())
           : [],
         images: mediaUrls,
+        banners: bannerUrls,
+        variants: normalizedVariants,
+        hasColorVariants: (normalizedVariants?.length || 0) > 0,
         artistName: selectedArtist ? selectedArtist.name : "",
         categoryName: selectedCategory?.name,
         createdAt: editingProduct ? editingProduct.createdAt : new Date(),
@@ -450,6 +675,9 @@ const ProductModal = ({
       formik.resetForm();
       setMediaFiles([]);
       setMediaPreviews([]);
+      setBannerFiles([]);
+      setMediaPreviews1([]);
+      formik.setFieldValue("banners", []);
       setNewMaterial("");
       setNewDimension({
         name: "",
@@ -479,11 +707,13 @@ const ProductModal = ({
     }
   };
 
-  console.log("formik", formik.errors);
   const handleCancel = () => {
     formik.resetForm();
     setMediaFiles([]);
     setMediaPreviews([]);
+    setBannerFiles([]);
+    setMediaPreviews1([]);
+    formik.setFieldValue("banners", []);
     setNewMaterial("");
     setNewDimension({
       name: "",
@@ -500,6 +730,45 @@ const ProductModal = ({
     ORDER_TYPES.CUSTOM_ORDER,
     ORDER_TYPES.COMMISSION,
   ].includes(formik.values.orderType);
+
+  // ✅ Handlers (put inside component)
+  const addDescriptionRow = () => {
+    const field = newDescRow.field.trim();
+    const value = newDescRow.value.trim();
+    if (!field || !value) return;
+
+    // prevent duplicate field names (optional)
+    const exists = (formik.values.descriptionFields || []).some(
+      (r) => r.field.toLowerCase() === field.toLowerCase()
+    );
+    if (exists) {
+      toast.warning("That field name already exists.");
+      return;
+    }
+
+    formik.setFieldValue("descriptionFields", [
+      ...(formik.values.descriptionFields || []),
+      { field, value },
+    ]);
+    setNewDescRow({ field: "", value: "" });
+  };
+
+  const updateDescriptionRow = (
+    index: number,
+    key: "field" | "value",
+    val: string
+  ) => {
+    const next = [...(formik.values.descriptionFields || [])];
+    next[index] = { ...next[index], [key]: val };
+    formik.setFieldValue("descriptionFields", next);
+  };
+
+  const removeDescriptionRow = (index: number) => {
+    const next = (formik.values.descriptionFields || []).filter(
+      (_, i) => i !== index
+    );
+    formik.setFieldValue("descriptionFields", next);
+  };
 
   return (
     <MasterDrawer
@@ -629,6 +898,104 @@ const ProductModal = ({
                 </p>
               )}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* ✅ UI section for Dynamic Description (place among your <Card>s) */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Detailed Description</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Add Row */}
+            <div className="grid grid-cols-12 gap-2 items-end">
+              <div className="col-span-5">
+                <Label>Field Name</Label>
+                <Input
+                  placeholder="e.g., Medium, Year, Style"
+                  value={newDescRow.field}
+                  onChange={(e) =>
+                    setNewDescRow((r) => ({ ...r, field: e.target.value }))
+                  }
+                />
+              </div>
+              <div className="col-span-6">
+                <Label>Value</Label>
+                <Input
+                  placeholder="e.g., Oil on Canvas"
+                  value={newDescRow.value}
+                  onChange={(e) =>
+                    setNewDescRow((r) => ({ ...r, value: e.target.value }))
+                  }
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                      e.preventDefault();
+                      addDescriptionRow();
+                    }
+                  }}
+                />
+              </div>
+              <div className="col-span-1 flex">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={addDescriptionRow}
+                  aria-label="Add"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Existing Rows */}
+            <div className="space-y-2">
+              {(formik.values.descriptionFields || []).map((row, index) => (
+                <div
+                  key={index}
+                  className="grid grid-cols-12 gap-2 items-center bg-gray-50 rounded p-2"
+                >
+                  <div className="col-span-5">
+                    <Input
+                      value={row.field}
+                      onChange={(e) =>
+                        updateDescriptionRow(index, "field", e.target.value)
+                      }
+                      placeholder="Field"
+                    />
+                  </div>
+                  <div className="col-span-6">
+                    <Input
+                      value={row.value}
+                      onChange={(e) =>
+                        updateDescriptionRow(index, "value", e.target.value)
+                      }
+                      placeholder="Value"
+                    />
+                  </div>
+                  <div className="col-span-1 flex justify-end">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeDescriptionRow(index)}
+                      aria-label="Remove"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {formik.touched.descriptionFields &&
+              formik.errors.descriptionFields && (
+                <p className="text-red-500 text-sm mt-1">
+                  {/* @ts-ignore */}
+                  {typeof formik.errors.descriptionFields === "string"
+                    ? formik.errors.descriptionFields
+                    : "Please fix the highlighted description rows."}
+                </p>
+              )}
           </CardContent>
         </Card>
 
@@ -1066,6 +1433,187 @@ const ProductModal = ({
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader>
+            <CardTitle>Color Variants</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-2">
+              <Button type="button" onClick={addVariant} size="sm">
+                <Plus className="h-4 w-4" /> Add Color
+              </Button>
+            </div>
+
+            {formik.values.variants.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                No color variants yet.
+              </p>
+            )}
+
+            <div className="space-y-3">
+              {formik.values.variants.map((v, idx) => (
+                <div key={v.id} className="rounded border p-3 space-y-3">
+                  <div className="grid grid-cols-12 gap-3 items-end">
+                    <div className="col-span-3">
+                      <Label>Color Name *</Label>
+                      <Input
+                        value={v.colorName}
+                        onChange={(e) => {
+                          const next = [...formik.values.variants];
+                          next[idx] = {
+                            ...next[idx],
+                            colorName: e.target.value,
+                          };
+                          formik.setFieldValue("variants", next);
+                        }}
+                        placeholder="e.g., Red"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <Label>Color HEX *</Label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={v.colorHex || "#000000"}
+                          onChange={(e) => {
+                            const next = [...formik.values.variants];
+                            next[idx] = {
+                              ...next[idx],
+                              colorHex: e.target.value,
+                            };
+                            formik.setFieldValue("variants", next);
+                          }}
+                          className="h-9 w-12 rounded border"
+                        />
+                        <Input
+                          value={v.colorHex}
+                          onChange={(e) => {
+                            const next = [...formik.values.variants];
+                            next[idx] = {
+                              ...next[idx],
+                              colorHex: e.target.value,
+                            };
+                            formik.setFieldValue("variants", next);
+                          }}
+                          placeholder="#000000"
+                        />
+                      </div>
+                    </div>
+                    <div className="col-span-2">
+                      <Label>SKU</Label>
+                      <Input
+                        value={v.sku || ""}
+                        onChange={(e) => {
+                          const next = [...formik.values.variants];
+                          next[idx] = { ...next[idx], sku: e.target.value };
+                          formik.setFieldValue("variants", next);
+                        }}
+                        placeholder="Optional"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <Label>Price + ($)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={v.priceAdjustment ?? ""}
+                        onChange={(e) => {
+                          const next = [...formik.values.variants];
+                          next[idx] = {
+                            ...next[idx],
+                            priceAdjustment: e.target.value,
+                          };
+                          formik.setFieldValue("variants", next);
+                        }}
+                        placeholder="0.00"
+                      />
+                    </div>
+                    {formik.values.orderType === ORDER_TYPES.READY_MADE && (
+                      <div className="col-span-2">
+                        <Label>Quantity</Label>
+                        <Input
+                          type="number"
+                          value={v.quantity ?? ""}
+                          onChange={(e) => {
+                            const next = [...formik.values.variants];
+                            next[idx] = {
+                              ...next[idx],
+                              quantity: e.target.value,
+                            };
+                            formik.setFieldValue("variants", next);
+                          }}
+                          placeholder="0"
+                        />
+                      </div>
+                    )}
+                    <div className="col-span-1 flex items-center gap-2">
+                      <Checkbox
+                        checked={!!v.isDefault}
+                        onCheckedChange={() => setDefaultVariant(v.id)}
+                        id={`default-${v.id}`}
+                      />
+                      <Label htmlFor={`default-${v.id}`}>Default</Label>
+                    </div>
+                    <div className="col-span-12 flex justify-between">
+                      <div className="space-y-2 w-full">
+                        <Label>Variant Media</Label>
+                        <Input
+                          type="file"
+                          multiple
+                          accept="image/jpeg,image/png,image/gif,video/mp4,video/webm,video/ogg"
+                          onChange={(e) =>
+                            handleVariantMediaChange(v.id, e.target.files)
+                          }
+                          className="cursor-pointer"
+                        />
+                        {(variantPreviews[v.id]?.length || 0) > 0 && (
+                          <div className="grid grid-cols-3 gap-3 mt-2">
+                            {variantPreviews[v.id].map((p, i) => (
+                              <div key={i} className="relative">
+                                {p.type === "image" ? (
+                                  <img
+                                    src={p.url}
+                                    className="w-full h-24 object-cover rounded border"
+                                  />
+                                ) : (
+                                  <video
+                                    src={p.url}
+                                    controls
+                                    className="w-full h-24 object-cover rounded border"
+                                  />
+                                )}
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="absolute top-1 right-1 bg-gray-800/60"
+                                  onClick={() => removeVariantMedia(v.id, i)}
+                                >
+                                  <X className="h-4 w-4 text-white" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeVariant(v.id)}
+                        className="self-start ml-2"
+                        aria-label="Remove variant"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Materials */}
         <Card>
           <CardHeader>
@@ -1219,6 +1767,22 @@ const ProductModal = ({
           </Card>
         )}
 
+        {/* UI: DropdownMenu multi-select (scrollable) */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Related Products</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Label>Choose related products</Label>
+            <MultiSelect
+              options={productOptions}
+              value={formik.values.relatedProducts}
+              onChange={(next) => formik.setFieldValue("relatedProducts", next)}
+              placeholder="Select related products"
+            />
+          </CardContent>
+        </Card>
+
         {/* Tags */}
         <Card>
           <CardHeader>
@@ -1236,6 +1800,61 @@ const ProductModal = ({
                 onBlur={formik.handleBlur}
               />
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Product Banners</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="banner">Upload Images or Videos</Label>
+              <Input
+                id="banner"
+                type="file"
+                multiple
+                accept="image/jpeg,image/png,image/gif,video/mp4,video/webm,video/ogg"
+                onChange={handleBannerChange}
+                className="cursor-pointer"
+              />
+              {formik.touched.banners && formik.errors.banners && (
+                <p className="text-red-500 text-sm mt-1">
+                  {formik.errors.banners}
+                </p>
+              )}
+            </div>
+
+            {mediaPreviews1.length > 0 && (
+              <div className="grid grid-cols-3 gap-4">
+                {mediaPreviews1.map((preview, index) => (
+                  <div key={index} className="relative">
+                    {preview.type === "image" ? (
+                      <img
+                        src={preview.url}
+                        alt={`Preview ${index + 1}`}
+                        className="w-full h-32 object-cover rounded-lg border"
+                      />
+                    ) : (
+                      <video
+                        src={preview.url}
+                        controls
+                        className="w-full h-32 object-cover rounded-lg border"
+                      />
+                    )}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute top-1 right-1 bg-gray-800 bg-opacity-50"
+                      onClick={() => removeBanner(index)}
+                    >
+                      <X className="h-4 w-4 text-white" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
