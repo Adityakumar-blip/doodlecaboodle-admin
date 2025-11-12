@@ -73,6 +73,12 @@ const ProductCategoriesModal = ({
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
   const [uploading, setUploading] = useState(false);
+  // ✅ New: multiple banner/gallery upload states
+  const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
+  const [galleryPreviews, setGalleryPreviews] = useState<string[]>([]);
+  const [galleryUrls, setGalleryUrls] = useState<string[]>([]);
+  const galleryInputRef = useRef(null);
+
   const bannerInputRef = useRef(null);
   const imageInputRef = useRef(null);
 
@@ -96,6 +102,7 @@ const ProductCategoriesModal = ({
     sortOrder: 0,
     imageUrl: "",
     bannerUrl: "",
+    galleryImages: [],
     iconClass: "",
     color: "#000000",
     metaTitle: "",
@@ -160,6 +167,22 @@ const ProductCategoriesModal = ({
           updatedAt: new Date(),
         };
 
+        if (galleryFiles.length > 0) {
+          setUploading(true);
+          try {
+            const uploadPromises = galleryFiles.map((file) =>
+              uploadImagesToCloudinary(file)
+            );
+            const uploadedUrls = await Promise.all(uploadPromises);
+            categoryData.galleryImages = uploadedUrls; // new field
+            setGalleryUrls(uploadedUrls);
+          } catch (error) {
+            throw new Error("Failed to upload gallery images to Cloudinary");
+          } finally {
+            setUploading(false);
+          }
+        }
+
         // Clean up parentId and parentName if no parent
         if (!categoryData.parentId) {
           categoryData.parentId = null;
@@ -210,6 +233,38 @@ const ProductCategoriesModal = ({
     },
   });
 
+  // ✅ Handle multiple gallery image selections
+  const handleGalleryFileSelect = (event) => {
+    const files = Array.from(event.target.files);
+    if (!files.length) return;
+
+    const validFiles = files.filter((file: any) =>
+      file.type.startsWith("image/")
+    );
+    if (validFiles.length !== files.length) {
+      alert("Some files were skipped because they are not valid images.");
+    }
+
+    // Preview selected images
+    const previews = validFiles.map((file: any) => URL.createObjectURL(file));
+    setGalleryFiles((prev: any) => [...prev, ...validFiles]);
+    setGalleryPreviews((prev) => [...prev, ...previews]);
+  };
+
+  const removeGalleryImage = (index) => {
+    // Remove from local state
+    const newFiles = galleryFiles.filter((_, i) => i !== index);
+    const newPreviews = galleryPreviews.filter((_, i) => i !== index);
+    const newUrls = galleryUrls.filter((_, i) => i !== index);
+
+    setGalleryFiles(newFiles);
+    setGalleryPreviews(newPreviews);
+    setGalleryUrls(newUrls);
+
+    // CRITICAL: Also update Formik
+    formik.setFieldValue("galleryImages", newUrls);
+  };
+
   // Set initial banner preview if editing
   useEffect(() => {
     if (mode === "edit" && selectedCategory?.bannerUrl) {
@@ -219,6 +274,18 @@ const ProductCategoriesModal = ({
       setImagePreview(selectedCategory.imageUrl);
     }
   }, [mode, selectedCategory]);
+
+  // Initialize gallery previews when editing
+  useEffect(() => {
+    if (mode === "edit" && selectedCategory?.galleryImages?.length > 0) {
+      setGalleryPreviews(selectedCategory.galleryImages);
+      setGalleryUrls(selectedCategory.galleryImages);
+    } else {
+      // Reset when switching to create or no gallery
+      setGalleryPreviews([]);
+      setGalleryUrls([]);
+    }
+  }, [mode, selectedCategory?.galleryImages]);
 
   // Lookup and set parentName if missing during edit mode
   useEffect(() => {
@@ -720,6 +787,59 @@ const ProductCategoriesModal = ({
                       <X className="h-3 w-3" />
                     </Button>
                   )}
+                </div>
+              )}
+            </div>
+
+            {/* ✅ Additional Banner Images (Gallery) */}
+            <div className="space-y-2">
+              <Label>Additional Banner Images (Gallery)</Label>
+
+              {mode !== "view" && (
+                <div className="space-y-2">
+                  <input
+                    ref={galleryInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleGalleryFileSelect}
+                    className="hidden"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => galleryInputRef.current?.click()}
+                    disabled={uploading}
+                    className="w-full"
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    {uploading ? "Uploading..." : "Upload Multiple Banners"}
+                  </Button>
+                </div>
+              )}
+
+              {galleryPreviews.length > 0 && (
+                <div className="grid grid-cols-3 gap-2 mt-3">
+                  {galleryPreviews.map((preview, index) => (
+                    <div key={index} className="relative">
+                      <img
+                        src={preview}
+                        alt={`Gallery ${index + 1}`}
+                        className="w-full h-24 object-cover rounded-lg border"
+                      />
+                      {mode !== "view" && (
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          className="absolute top-1 right-1"
+                          onClick={() => removeGalleryImage(index)}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

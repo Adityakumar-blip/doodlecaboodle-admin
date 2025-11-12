@@ -1803,7 +1803,7 @@ const ProductModal = ({
           </CardContent>
         </Card>
 
-        <Card>
+        {/* <Card>
           <CardHeader>
             <CardTitle>Product Banners</CardTitle>
           </CardHeader>
@@ -1856,7 +1856,7 @@ const ProductModal = ({
               </div>
             )}
           </CardContent>
-        </Card>
+        </Card> */}
 
         {/* Media */}
         <Card>
