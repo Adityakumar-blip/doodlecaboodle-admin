@@ -61,6 +61,7 @@ type Product = {
   quantity: number;
   category: string;
   status: "active" | "inactive";
+  isOutOfStock?: boolean; // <-- ADDED
   createdAt?: Date;
   updatedAt?: Date;
   categoryName?: string;
@@ -76,6 +77,7 @@ const initialProducts: Product[] = [
     quantity: 120,
     category: "Electronics",
     status: "active",
+    isOutOfStock: false, // <-- ADDED
     displayOrder: 1,
   },
   {
@@ -86,6 +88,7 @@ const initialProducts: Product[] = [
     quantity: 500,
     category: "Stationery",
     status: "active",
+    isOutOfStock: false, // <-- ADDED
     displayOrder: 2,
   },
 ];
@@ -109,11 +112,11 @@ export default function ProductList() {
       const fetchedProducts = querySnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
+        isOutOfStock: doc.data().isOutOfStock ?? false, // <-- ADDED
         createdAt: doc.data().createdAt?.toDate(),
         updatedAt: doc.data().updatedAt?.toDate(),
       })) as Product[];
 
-      // Sort products by displayOrder
       const sortedProducts = fetchedProducts.sort((a, b) => {
         const orderA = a.displayOrder ?? 999999;
         const orderB = b.displayOrder ?? 999999;
@@ -144,7 +147,7 @@ export default function ProductList() {
       await deleteDoc(doc(db, "products", productId));
       setProducts((prev) => prev.filter((product) => product.id !== productId));
       setOriginalProducts((prev) =>
-        prev.filter((product) => product.id !== productId),
+        prev.filter((product) => product.id !== productId)
       );
       toast.success("Product deleted successfully");
     } catch (error) {
@@ -155,7 +158,7 @@ export default function ProductList() {
 
   const handleStatusToggle = async (
     productId: string,
-    currentStatus: string,
+    currentStatus: string
   ) => {
     const newStatus = currentStatus === "active" ? "inactive" : "active";
 
@@ -169,14 +172,14 @@ export default function ProductList() {
         prev.map((product) =>
           product.id === productId
             ? { ...product, status: newStatus as "active" | "inactive" }
-            : product,
-        ),
+            : product
+        )
       );
 
       toast.success(
         `Product ${
           newStatus === "active" ? "activated" : "deactivated"
-        } successfully`,
+        } successfully`
       );
     } catch (error) {
       console.error("Error updating product status:", error);
@@ -184,25 +187,54 @@ export default function ProductList() {
     }
   };
 
+  // NEW: Out of stock toggle
+  const handleOutOfStockToggle = async (product: Product) => {
+    const newVal = !product.isOutOfStock;
+    try {
+      await updateDoc(doc(db, "products", product.id), {
+        isOutOfStock: newVal,
+        updatedAt: new Date(),
+      });
+
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.id === product.id ? { ...p, isOutOfStock: newVal } : p
+        )
+      );
+
+      toast.success(newVal ? "Marked as Out of Stock" : "Marked as In Stock");
+    } catch (error) {
+      console.error("Error updating isOutOfStock:", error);
+      toast.error("Failed to update stock status");
+    }
+  };
+
   const handleProductAdded = (newProduct: Product) => {
     if (editingProduct) {
-      // Update existing product
-      const updatedProduct = { ...newProduct, id: editingProduct.id };
+      const updatedProduct = {
+        ...newProduct,
+        id: editingProduct.id,
+        isOutOfStock: newProduct.isOutOfStock ?? false, // <-- ADDED
+      };
+
       setProducts((prev) =>
         prev.map((product) =>
-          product.id === editingProduct.id ? updatedProduct : product,
-        ),
+          product.id === editingProduct.id ? updatedProduct : product
+        )
       );
       setOriginalProducts((prev) =>
         prev.map((product) =>
-          product.id === editingProduct.id ? updatedProduct : product,
-        ),
+          product.id === editingProduct.id ? updatedProduct : product
+        )
       );
       toast.success("Product updated successfully");
     } else {
-      // Add new product with highest display order
       const maxOrder = Math.max(...products.map((p) => p.displayOrder || 0), 0);
-      const productWithOrder = { ...newProduct, displayOrder: maxOrder + 1 };
+      const productWithOrder = {
+        ...newProduct,
+        displayOrder: maxOrder + 1,
+        isOutOfStock: newProduct.isOutOfStock ?? false, // <-- ADDED
+      };
       setProducts((prev) => [...prev, productWithOrder]);
       setOriginalProducts((prev) => [...prev, productWithOrder]);
       toast.success("Product added successfully");
@@ -215,7 +247,6 @@ export default function ProductList() {
     setEditingProduct(null);
   };
 
-  // Reorder functionality
   const onDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -267,11 +298,6 @@ export default function ProductList() {
     setIsReorderMode(false);
   };
 
-  const enterReorderMode = () => {
-    setOriginalProducts([...products]);
-    setIsReorderMode(true);
-  };
-
   const exitReorderMode = () => {
     if (hasUnsavedChanges) {
       if (
@@ -284,26 +310,21 @@ export default function ProductList() {
     setIsReorderMode(false);
   };
 
-  // Get unique categories for filter
   const uniqueCategories = useMemo(() => {
     const categories = new Set(
-      products.map((p) => p.categoryName || p.category).filter(Boolean),
+      products.map((p) => p.categoryName || p.category).filter(Boolean)
     );
     return Array.from(categories).sort();
   }, [products]);
 
-  // Filter products based on selected category
   const filteredProducts = useMemo(() => {
-    if (selectedCategory === "all") {
-      return products;
-    }
+    if (selectedCategory === "all") return products;
     return products.filter(
       (p) =>
-        p.categoryName === selectedCategory || p.category === selectedCategory,
+        p.categoryName === selectedCategory || p.category === selectedCategory
     );
   }, [products, selectedCategory]);
 
-  // Sortable Item Component for Reorder Mode
   const SortableItem: React.FC<{ product: Product; index: number }> = ({
     product,
     index,
@@ -376,7 +397,6 @@ export default function ProductList() {
     );
   };
 
-  // Reorder List Component
   const ReorderList: React.FC = () => (
     <DndContext collisionDetection={closestCenter} onDragEnd={onDragEnd}>
       <SortableContext
@@ -392,7 +412,6 @@ export default function ProductList() {
     </DndContext>
   );
 
-  // Regular columns for data table
   const columns: DataTableColumn<Product>[] = [
     {
       id: "displayOrder",
@@ -438,6 +457,19 @@ export default function ProductList() {
         </div>
       ),
       sortable: true,
+    },
+    {
+      id: "isOutOfStock",
+      header: "Out of Stock",
+      cell: (item) =>
+        item.categoryName !== "Painting" && item.categoryName !== "Sketch" ? (
+          <Switch
+            checked={item?.isOutOfStock}
+            onCheckedChange={() => handleOutOfStockToggle(item)}
+          />
+        ) : (
+          "---"
+        ),
     },
     {
       id: "category",
@@ -499,7 +531,7 @@ export default function ProductList() {
                 <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                 <AlertDialogDescription>
                   This action cannot be undone. This will permanently delete the
-                  product "{item.name}" and remove it from our servers.
+                  product "{item.name}".
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -521,7 +553,7 @@ export default function ProductList() {
   const getStatusCounts = () => {
     const activeCount = products.filter((p) => p.status === "active").length;
     const inactiveCount = products.filter(
-      (p) => p.status === "inactive",
+      (p) => p.status === "inactive"
     ).length;
     const lowStockCount = products.filter((p) => p.quantity <= 10).length;
 
@@ -564,18 +596,14 @@ export default function ProductList() {
         <div className="flex gap-2">
           {!isReorderMode ? (
             <>
-              <Button variant="outline" onClick={enterReorderMode}>
+              <Button variant="outline" onClick={() => setIsReorderMode(true)}>
                 Reorder Products
               </Button>
               <Button onClick={() => setDrawerOpen(true)}>Add Product</Button>
             </>
           ) : (
             <>
-              <Button
-                variant="outline"
-                onClick={exitReorderMode}
-                disabled={saving}
-              >
+              <Button variant="outline" onClick={exitReorderMode}>
                 <X className="h-4 w-4 mr-2" />
                 Cancel
               </Button>
@@ -600,6 +628,7 @@ export default function ProductList() {
               Filter by Category:
             </span>
           </div>
+
           <Select value={selectedCategory} onValueChange={setSelectedCategory}>
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="Select category" />
@@ -613,34 +642,12 @@ export default function ProductList() {
               ))}
             </SelectContent>
           </Select>
+
           {selectedCategory !== "all" && (
             <Badge variant="outline" className="text-xs">
               Showing: {filteredProducts.length} of {products.length}
             </Badge>
           )}
-        </div>
-      )}
-
-      {isReorderMode && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-blue-800 font-medium">
-                Reorder Mode Active
-              </p>
-              <p className="text-xs text-blue-600">
-                Drag products to reorder them in the list.
-                {hasUnsavedChanges && (
-                  <span className="text-orange-600 ml-1">
-                    You have unsaved changes.
-                  </span>
-                )}
-              </p>
-            </div>
-            <div className="text-sm text-blue-600">
-              Total Products: {products.length}
-            </div>
-          </div>
         </div>
       )}
 

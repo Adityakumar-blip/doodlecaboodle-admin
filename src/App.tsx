@@ -37,6 +37,7 @@ import FAQDisplay from "./pages/FAQDisplay";
 import OrdersDisplay from "./pages/OrderDisplay";
 import ReviewsDisplay from "./pages/ReviewsDisplay";
 import FilterDisplay from "./pages/FilterDisplay";
+import ConfigurationDisplay from "./pages/ConfigurationDisplay";
 
 const queryClient = new QueryClient();
 
@@ -203,6 +204,14 @@ const App = () => (
                 element={
                   <AdminLayoutWrapper>
                     <SketchesPage />
+                  </AdminLayoutWrapper>
+                }
+              />
+              <Route
+                path="/configuration"
+                element={
+                  <AdminLayoutWrapper>
+                    <ConfigurationDisplay />
                   </AdminLayoutWrapper>
                 }
               />
