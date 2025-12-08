@@ -30,6 +30,7 @@ const validationSchema = Yup.object({
     .required("Description is required"),
   desktopImage: Yup.string().required("Desktop image is required"),
   mobileImage: Yup.string().required("Mobile image is required"),
+  url: Yup.string().url("Enter a valid URL").nullable(),
 });
 
 const BannerModal = ({
@@ -50,6 +51,7 @@ const BannerModal = ({
       description: editingBanner?.description || "",
       desktopImage: editingBanner?.desktopImage || "",
       mobileImage: editingBanner?.mobileImage || "",
+      url: editingBanner?.url || "",
     },
     validationSchema,
     onSubmit: async (values) => {
@@ -118,6 +120,7 @@ const BannerModal = ({
         ...values,
         desktopImage: desktopUrl,
         mobileImage: mobileUrl,
+        url: values.url || "",
         createdAt: editingBanner ? editingBanner.createdAt : new Date(),
         updatedAt: new Date(),
       };
@@ -244,6 +247,23 @@ const BannerModal = ({
                 <p className="text-red-500 text-sm mt-1">
                   {formik.errors.description}
                 </p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="url">URL (optional)</Label>
+              <Input
+                id="url"
+                name="url"
+                type="url"
+                placeholder="https://your-link.com"
+                value={formik.values.url}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                className={formik.touched.url && formik.errors.url ? "border-red-500" : ""}
+              />
+              {formik.touched.url && formik.errors.url && (
+                <p className="text-red-500 text-sm mt-1">{formik.errors.url}</p>
               )}
             </div>
           </CardContent>
