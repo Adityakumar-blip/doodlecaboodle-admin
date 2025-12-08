@@ -1566,10 +1566,49 @@ const ProductModal = ({
                           }
                           className="cursor-pointer"
                         />
-                        {(variantPreviews[v.id]?.length || 0) > 0 && (
+                        {(variantPreviews[v.id]?.length || v.images?.length) > 0 && (
                           <div className="grid grid-cols-3 gap-3 mt-2">
-                            {variantPreviews[v.id].map((p, i) => (
-                              <div key={i} className="relative">
+                            {/* Show already uploaded images/videos */}
+                            {Array.isArray(v.images) && v.images.map((img, i) => (
+                              <div key={"uploaded-" + i} className="relative">
+                                {img.type === "image" ? (
+                                  <img
+                                    src={img.url}
+                                    className="w-full h-24 object-cover rounded border"
+                                  />
+                                ) : (
+                                  <video
+                                    src={img.url}
+                                    controls
+                                    className="w-full h-24 object-cover rounded border"
+                                  />
+                                )}
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="absolute top-1 right-1 bg-gray-800/60"
+                                  onClick={() => {
+                                    // Remove from v.images on save
+                                    const nextVariants = formik.values.variants.map(variant => {
+                                      if (variant.id === v.id) {
+                                        return {
+                                          ...variant,
+                                          images: variant.images.filter((_, idx) => idx !== i)
+                                        };
+                                      }
+                                      return variant;
+                                    });
+                                    formik.setFieldValue("variants", nextVariants);
+                                  }}
+                                >
+                                  <X className="h-4 w-4 text-white" />
+                                </Button>
+                              </div>
+                            ))}
+                            {/* Show new previews */}
+                            {variantPreviews[v.id]?.map((p, i) => (
+                              <div key={"preview-" + i} className="relative">
                                 {p.type === "image" ? (
                                   <img
                                     src={p.url}

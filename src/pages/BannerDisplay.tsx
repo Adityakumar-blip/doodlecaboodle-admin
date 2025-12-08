@@ -1,4 +1,11 @@
 import React, { useEffect, useState } from "react";
+import { DndContext, closestCenter, DragEndEvent } from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
 import { DataTable, DataTableColumn } from "@/components/DataTable";
 import { collection, getDocs, deleteDoc, doc } from "firebase/firestore";
@@ -27,14 +34,136 @@ interface Banner {
   createdAt?: Date;
   updatedAt?: Date;
   mobileImage?: string;
+  desktopImage?: string;
+  displayOrder?: number;
 }
 
 const BannerDisplay: React.FC = () => {
   const [banners, setBanners] = useState<Banner[]>([]);
+  const [originalBanners, setOriginalBanners] = useState<Banner[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isReorderMode, setIsReorderMode] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [saving, setSaving] = useState(false);
 
+  // --- Reorder logic ---
+  const onDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = banners.findIndex((b) => b.id === active.id);
+    const newIndex = banners.findIndex((b) => b.id === over.id);
+
+    const newBanners = [...banners];
+    const [reorderedItem] = newBanners.splice(oldIndex, 1);
+    newBanners.splice(newIndex, 0, reorderedItem);
+
+    const updatedBanners = newBanners.map((banner, index) => ({
+      ...banner,
+      displayOrder: index + 1,
+    }));
+
+    setBanners(updatedBanners);
+    setHasUnsavedChanges(true);
+  };
+
+  const saveOrder = async () => {
+    setSaving(true);
+    try {
+      const { writeBatch } = await import("firebase/firestore");
+      const batch = writeBatch(db);
+      banners.forEach((banner, index) => {
+        const bannerRef = doc(db, "banners", banner.id);
+        batch.update(bannerRef, {
+          displayOrder: index + 1,
+          updatedAt: new Date(),
+        });
+      });
+      await batch.commit();
+      setOriginalBanners([...banners]);
+      setHasUnsavedChanges(false);
+      toast.success("Banner order saved successfully!");
+    } catch (error) {
+      console.error("Error saving order:", error);
+      toast.error("Failed to save banner order");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const cancelReorder = () => {
+    setBanners([...originalBanners]);
+    setHasUnsavedChanges(false);
+    setIsReorderMode(false);
+  };
+
+  function exitReorderMode() {
+    if (hasUnsavedChanges) {
+      if (window.confirm("You have unsaved changes. Discard changes and exit?")) {
+        cancelReorder();
+      }
+      return;
+    }
+    setIsReorderMode(false);
+  }
+
+  const SortableBanner: React.FC<{ banner: Banner; index: number }> = ({ banner, index }) => {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: banner.id });
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1,
+      scale: isDragging ? 0.95 : 1,
+    };
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        {...attributes}
+        {...listeners}
+        className="flex items-center gap-4 p-4 bg-white border rounded-lg transition-all border-gray-200 hover:shadow-md"
+      >
+        <div className="flex items-center gap-2">
+          <span className="cursor-grab"><Edit className="h-5 w-5 text-gray-400" /></span>
+        </div>
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="font-medium">{banner.title}</div>
+          </div>
+          <div className="text-sm text-gray-500 truncate">{banner.description}</div>
+        </div>
+        <div>
+          {banner.mobileImage && (
+            <img src={banner.mobileImage} alt={banner.title} className="w-16 h-16 object-cover rounded" />
+          )}
+        </div>
+        <div className="text-right text-xs text-gray-500">Order: {banner.displayOrder || index + 1}</div>
+      </div>
+    );
+  };
+
+  const ReorderList: React.FC = () => (
+    <DndContext collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+      <SortableContext items={banners.map((b) => b.id)} strategy={verticalListSortingStrategy}>
+        <div className="space-y-2">
+          {banners.map((banner, index) => (
+            <SortableBanner key={banner.id} banner={banner} index={index} />
+          ))}
+        </div>
+      </SortableContext>
+    </DndContext>
+  );
+
+  // --- End reorder logic ---
   const fetchBanners = async () => {
     setLoading(true);
     try {
@@ -45,7 +174,14 @@ const BannerDisplay: React.FC = () => {
         createdAt: doc.data().createdAt?.toDate(),
         updatedAt: doc.data().updatedAt?.toDate(),
       })) as Banner[];
-      setBanners(fetchedBanners);
+      // Sort by displayOrder if present
+      const sortedBanners = fetchedBanners.sort((a, b) => {
+        const orderA = a.displayOrder ?? 999999;
+        const orderB = b.displayOrder ?? 999999;
+        return orderA - orderB;
+      });
+      setBanners(sortedBanners);
+      setOriginalBanners([...sortedBanners]);
     } catch (error) {
       console.error("Error fetching banners:", error);
       toast.error("Failed to fetch banners");
@@ -189,17 +325,43 @@ const BannerDisplay: React.FC = () => {
             <Badge variant="default">Total: {banners.length}</Badge>
           </div>
         </div>
-        <Button onClick={() => setDrawerOpen(true)}>Add Banner</Button>
+        <div className="flex gap-2">
+          {!isReorderMode ? (
+            <>
+              <Button variant="outline" onClick={() => setIsReorderMode(true)}>
+                Reorder Banners
+              </Button>
+              <Button onClick={() => setDrawerOpen(true)}>Add Banner</Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" onClick={exitReorderMode}>
+                <span className="mr-2">✖</span>Cancel
+              </Button>
+              <Button
+                onClick={saveOrder}
+                disabled={!hasUnsavedChanges || saving}
+                className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400"
+              >
+                <span className="mr-2">💾</span>{saving ? "Saving..." : "Save Order"}
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
-      <DataTable
-        data={banners}
-        columns={columns}
-        keyExtractor={(item) => item.id}
-        searchable
-        pagination={{ pageSize: 10, pageSizeOptions: [5, 10, 20] }}
-        searchPlaceholder="Search banners by title or description..."
-      />
+      {isReorderMode ? (
+        <ReorderList />
+      ) : (
+        <DataTable
+          data={banners}
+          columns={columns}
+          keyExtractor={(item) => item.id}
+          searchable
+          pagination={{ pageSize: 10, pageSizeOptions: [5, 10, 20] }}
+          searchPlaceholder="Search banners by title or description..."
+        />
+      )}
 
       <BannerModal
         drawerOpen={drawerOpen}
