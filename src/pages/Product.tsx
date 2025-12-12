@@ -66,6 +66,7 @@ type Product = {
   updatedAt?: Date;
   categoryName?: string;
   displayOrder?: number;
+  categoryDisplayOrder?: number; // Order within category
 };
 
 const initialProducts: Product[] = [
@@ -104,6 +105,7 @@ export default function ProductList() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [saving, setSaving] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [reorderCategory, setReorderCategory] = useState<string>("all");
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -115,6 +117,7 @@ export default function ProductList() {
         isOutOfStock: doc.data().isOutOfStock ?? false, // <-- ADDED
         createdAt: doc.data().createdAt?.toDate(),
         updatedAt: doc.data().updatedAt?.toDate(),
+        categoryDisplayOrder: doc.data().categoryDisplayOrder ?? 999999,
       })) as Product[];
 
       const sortedProducts = fetchedProducts.sort((a, b) => {
@@ -247,23 +250,52 @@ export default function ProductList() {
     setEditingProduct(null);
   };
 
+  // Get products for reordering based on selected category
+  const reorderProducts = useMemo(() => {
+    if (reorderCategory === "all") {
+      return [...products].sort((a, b) => (a.displayOrder ?? 999999) - (b.displayOrder ?? 999999));
+    }
+    return products
+      .filter((p) => p.categoryName === reorderCategory || p.category === reorderCategory)
+      .sort((a, b) => (a.categoryDisplayOrder ?? 999999) - (b.categoryDisplayOrder ?? 999999));
+  }, [products, reorderCategory]);
+
   const onDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const oldIndex = products.findIndex((p) => p.id === active.id);
-    const newIndex = products.findIndex((p) => p.id === over.id);
+    const currentList = reorderProducts;
+    const oldIndex = currentList.findIndex((p) => p.id === active.id);
+    const newIndex = currentList.findIndex((p) => p.id === over.id);
 
-    const newProducts = [...products];
-    const [reorderedItem] = newProducts.splice(oldIndex, 1);
-    newProducts.splice(newIndex, 0, reorderedItem);
+    if (oldIndex === -1 || newIndex === -1) return;
 
-    const updatedProducts = newProducts.map((product, index) => ({
-      ...product,
-      displayOrder: index + 1,
-    }));
+    const newList = [...currentList];
+    const [reorderedItem] = newList.splice(oldIndex, 1);
+    newList.splice(newIndex, 0, reorderedItem);
 
-    setProducts(updatedProducts);
+    if (reorderCategory === "all") {
+      // Global reordering - update displayOrder
+      const updatedProducts = products.map((product) => {
+        const newPos = newList.findIndex((p) => p.id === product.id);
+        if (newPos !== -1) {
+          return { ...product, displayOrder: newPos + 1 };
+        }
+        return product;
+      });
+      setProducts(updatedProducts);
+    } else {
+      // Category-specific reordering - update categoryDisplayOrder
+      const updatedProducts = products.map((product) => {
+        const newPos = newList.findIndex((p) => p.id === product.id);
+        if (newPos !== -1) {
+          return { ...product, categoryDisplayOrder: newPos + 1 };
+        }
+        return product;
+      });
+      setProducts(updatedProducts);
+    }
+
     setHasUnsavedChanges(true);
   };
 
@@ -272,18 +304,36 @@ export default function ProductList() {
     try {
       const batch = writeBatch(db);
 
-      products.forEach((product, index) => {
-        const productRef = doc(db, "products", product.id);
-        batch.update(productRef, {
-          displayOrder: index + 1,
-          updatedAt: new Date(),
+      if (reorderCategory === "all") {
+        // Save global display order
+        products.forEach((product) => {
+          const productRef = doc(db, "products", product.id);
+          batch.update(productRef, {
+            displayOrder: product.displayOrder,
+            updatedAt: new Date(),
+          });
         });
-      });
+      } else {
+        // Save category-specific order only for products in selected category
+        const categoryProducts = products.filter(
+          (p) => p.categoryName === reorderCategory || p.category === reorderCategory
+        );
+        categoryProducts.forEach((product) => {
+          const productRef = doc(db, "products", product.id);
+          batch.update(productRef, {
+            categoryDisplayOrder: product.categoryDisplayOrder,
+            updatedAt: new Date(),
+          });
+        });
+      }
 
       await batch.commit();
       setOriginalProducts([...products]);
       setHasUnsavedChanges(false);
-      toast.success("Product order saved successfully!");
+      const msg = reorderCategory === "all" 
+        ? "Product order saved successfully!" 
+        : `Order saved for "${reorderCategory}" category!`;
+      toast.success(msg);
     } catch (error) {
       console.error("Error saving order:", error);
       toast.error("Failed to save product order");
@@ -296,6 +346,7 @@ export default function ProductList() {
     setProducts([...originalProducts]);
     setHasUnsavedChanges(false);
     setIsReorderMode(false);
+    setReorderCategory("all");
   };
 
   const exitReorderMode = () => {
@@ -308,6 +359,7 @@ export default function ProductList() {
       return;
     }
     setIsReorderMode(false);
+    setReorderCategory("all");
   };
 
   const uniqueCategories = useMemo(() => {
@@ -390,7 +442,10 @@ export default function ProductList() {
         <div className="text-right">
           <div className="font-medium">₹{product.price.toLocaleString()}</div>
           <div className="text-sm text-gray-500">
-            Order: {product.displayOrder || index + 1}
+            {reorderCategory === "all" 
+              ? `Global: ${product.displayOrder || index + 1}`
+              : `Category: ${product.categoryDisplayOrder || index + 1}`
+            }
           </div>
         </div>
       </div>
@@ -400,11 +455,11 @@ export default function ProductList() {
   const ReorderList: React.FC = () => (
     <DndContext collisionDetection={closestCenter} onDragEnd={onDragEnd}>
       <SortableContext
-        items={products.map((p) => p.id)}
+        items={reorderProducts.map((p) => p.id)}
         strategy={verticalListSortingStrategy}
       >
         <div className="space-y-2">
-          {products.map((product, index) => (
+          {reorderProducts.map((product, index) => (
             <SortableItem key={product.id} product={product} index={index} />
           ))}
         </div>
@@ -652,7 +707,50 @@ export default function ProductList() {
       )}
 
       {isReorderMode ? (
-        <ReorderList />
+        <div className="space-y-4">
+          {/* Category selector for reorder mode */}
+          <div className="flex items-center gap-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-center gap-2">
+              <GripVertical className="h-5 w-5 text-amber-600" />
+              <span className="text-sm font-medium text-amber-800">
+                Reorder Mode
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">Reorder:</span>
+              <Select value={reorderCategory} onValueChange={(val) => {
+                if (hasUnsavedChanges) {
+                  if (window.confirm("You have unsaved changes. Discard and switch category?")) {
+                    setProducts([...originalProducts]);
+                    setHasUnsavedChanges(false);
+                    setReorderCategory(val);
+                  }
+                } else {
+                  setReorderCategory(val);
+                }
+              }}>
+                <SelectTrigger className="w-[200px] bg-white">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Products (Global)</SelectItem>
+                  {uniqueCategories.map((category) => (
+                    <SelectItem key={category} value={category}>
+                      {category}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Badge variant="outline" className="bg-white">
+              {reorderCategory === "all" 
+                ? `${reorderProducts.length} products (global order)`
+                : `${reorderProducts.length} products in "${reorderCategory}"`
+              }
+            </Badge>
+          </div>
+          <ReorderList />
+        </div>
       ) : (
         <DataTable
           data={filteredProducts}
