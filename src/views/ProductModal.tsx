@@ -43,6 +43,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import MultiSelect from "@/components/MultipleSelect";
+import TreeMultiSelect, { TreeOption } from "@/components/TreeMultiSelect";
 
 const db = getFirestore();
 const storage = getStorage();
@@ -146,6 +147,7 @@ const ProductModal = ({
 }) => {
   const [categories, setCategories] = useState([]);
   const [subcategories, setSubcategories] = useState([]);
+  const [menuItems, setMenuItems] = useState<TreeOption[]>([]);
   const [artists, setArtists] = useState([]);
   const [loading, setLoading] = useState(false);
   const [mediaFiles, setMediaFiles] = useState([]);
@@ -175,6 +177,7 @@ const ProductModal = ({
   const formik: any = useFormik({
     initialValues: {
       sectionCategoryIds: editingProduct?.sectionCategoryIds || [],
+      menuManagerCategoryIds: editingProduct?.menuManagerCategoryIds || [],
       isBestSeller: editingProduct?.isBestSeller || false,
       name: editingProduct?.name || "",
       description: editingProduct?.description || "",
@@ -225,6 +228,7 @@ const ProductModal = ({
     fetchCategories();
     fetchArtists();
     fetchAllProducts();
+    fetchMenuItems();
     if (editingProduct && editingProduct.images) {
       setMediaPreviews(editingProduct.images);
       setMediaFiles(editingProduct.images); // Initialize mediaFiles with existing images
@@ -366,6 +370,20 @@ const ProductModal = ({
     } catch (error) {
       console.error("Error fetching artists:", error);
       toast.error("Failed to load artists");
+    }
+  };
+
+  const fetchMenuItems = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, "menus"));
+      const items = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        name: doc.data().name,
+        parentId: doc.data().parentId,
+      })) as TreeOption[];
+      setMenuItems(items);
+    } catch (error) {
+      console.error("Error fetching menu items:", error);
     }
   };
 
@@ -1194,6 +1212,23 @@ const ProductModal = ({
                   </div>
                 </PopoverContent>
               </Popover>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Menu Manager Categories</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div>
+              <Label className="mb-2 block">Select menu categories for this product</Label>
+              <TreeMultiSelect
+                options={menuItems}
+                value={formik.values.menuManagerCategoryIds || []}
+                onChange={(vals) => formik.setFieldValue("menuManagerCategoryIds", vals)}
+                placeholder="Select menu categories..."
+              />
             </div>
           </CardContent>
         </Card>

@@ -38,6 +38,8 @@ import OrdersDisplay from "./pages/OrderDisplay";
 import ReviewsDisplay from "./pages/ReviewsDisplay";
 import FilterDisplay from "./pages/FilterDisplay";
 import ConfigurationDisplay from "./pages/ConfigurationDisplay";
+import MenuManager from "./pages/MenuManager";
+
 
 const queryClient = new QueryClient();
 
@@ -180,6 +182,16 @@ const App = () => (
                   </AdminLayoutWrapper>
                 }
               />
+
+              <Route
+                path="/menu-manager"
+                element={
+                  <AdminLayoutWrapper>
+                    <MenuManager />
+                  </AdminLayoutWrapper>
+                }
+              />
+
 
               <Route
                 path="/messages"

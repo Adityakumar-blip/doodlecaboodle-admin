@@ -109,6 +109,12 @@ const MainSidebar = ({
       showTo: true,
     },
     {
+      to: "/menu-manager",
+      label: "Menu Manager",
+      icon: Menu,
+      showTo: true,
+    },
+    {
       to: "/products",
       label: "Products",
       icon: GiftIcon,
