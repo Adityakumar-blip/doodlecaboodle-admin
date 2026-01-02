@@ -111,8 +111,7 @@ const validationSchema = Yup.object({
             otherwise: (schema) => schema.nullable(),
           }),
       })
-    )
-    .min(1, "At least one dimension is required"),
+    ),
   materials: Yup.array()
     .of(Yup.string().required())
     .min(1, "At least one material is required"),
@@ -1330,12 +1329,12 @@ const ProductModal = ({
         {/* Dimensions */}
         <Card>
           <CardHeader>
-            <CardTitle>Dimensions *</CardTitle>
+            <CardTitle>Dimensions</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-6 gap-2 items-end">
               <div>
-                <Label>Size *</Label>
+                <Label>Size</Label>
                 <Select
                   value={newDimension.name}
                   onValueChange={(value) =>
