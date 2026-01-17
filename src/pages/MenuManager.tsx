@@ -59,6 +59,7 @@ interface MenuItem {
   slug: string;
   parentId: string | null;
   isActive: boolean;
+  isCategory: boolean;
   displayOrder: number;
   level: number;
 }
@@ -76,6 +77,7 @@ export default function MenuManager() {
   const [newItemName, setNewItemName] = useState("");
   const [newItemSlug, setNewItemSlug] = useState("");
   const [newItemIsActive, setNewItemIsActive] = useState(true);
+  const [newItemIsCategory, setNewItemIsCategory] = useState(false);
   const [newItemParentId, setNewItemParentId] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -132,6 +134,7 @@ export default function MenuManager() {
       name: newItemName,
       slug: newItemSlug || newItemName.toLowerCase().replace(/\s+/g, "-"),
       isActive: newItemIsActive,
+      isCategory: newItemIsCategory,
       parentId: newItemParentId,
       updatedAt: new Date(),
     };
@@ -162,6 +165,7 @@ export default function MenuManager() {
     setNewItemName("");
     setNewItemSlug("");
     setNewItemIsActive(true);
+    setNewItemIsCategory(false);
     setNewItemParentId(null);
     setEditingItem(null);
   };
@@ -171,6 +175,7 @@ export default function MenuManager() {
     setNewItemName(item.name);
     setNewItemSlug(item.slug);
     setNewItemIsActive(item.isActive);
+    setNewItemIsCategory(item.isCategory || false);
     setNewItemParentId(item.parentId);
     setDialogOpen(true);
   };
@@ -392,13 +397,23 @@ export default function MenuManager() {
                   ))}
               </select>
             </div>
-            <div className="flex items-center space-x-2">
-              <Switch 
-                id="active" 
-                checked={newItemIsActive} 
-                onCheckedChange={setNewItemIsActive}
-              />
-              <Label htmlFor="active">Active State</Label>
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center space-x-2">
+                <Switch 
+                  id="active" 
+                  checked={newItemIsActive} 
+                  onCheckedChange={setNewItemIsActive}
+                />
+                <Label htmlFor="active">Active State</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch 
+                  id="isCategory" 
+                  checked={newItemIsCategory} 
+                  onCheckedChange={setNewItemIsCategory}
+                />
+                <Label htmlFor="isCategory">Is Category</Label>
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -494,6 +509,11 @@ function TreeItemRow({
               <span className={`font-semibold text-sm ${!item.isActive && "text-muted-foreground line-through"}`}>
                 {item.name}
               </span>
+              {item.isCategory && (
+                <span className="text-[10px] bg-artist-purple/10 text-artist-purple px-1.5 py-0.5 rounded-full font-medium">
+                  Category
+                </span>
+              )}
               {item.children.length > 0 && (
                 <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground">
                   {item.children.length}
