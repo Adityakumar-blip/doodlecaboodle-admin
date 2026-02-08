@@ -61,7 +61,8 @@ type Product = {
   quantity: number;
   category: string;
   status: "active" | "inactive";
-  isOutOfStock?: boolean; // <-- ADDED
+  isOutOfStock?: boolean;
+  showInCategory?: boolean; // <-- ADDED
   createdAt?: Date;
   updatedAt?: Date;
   categoryName?: string;
@@ -114,7 +115,8 @@ export default function ProductList() {
       const fetchedProducts = querySnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
-        isOutOfStock: doc.data().isOutOfStock ?? false, // <-- ADDED
+        isOutOfStock: doc.data().isOutOfStock ?? false,
+        showInCategory: doc.data().showInCategory ?? true, // <-- ADDED
         createdAt: doc.data().createdAt?.toDate(),
         updatedAt: doc.data().updatedAt?.toDate(),
         categoryDisplayOrder: doc.data().categoryDisplayOrder ?? 999999,
@@ -212,12 +214,35 @@ export default function ProductList() {
     }
   };
 
+  // NEW: Show in category toggle
+  const handleShowInCategoryToggle = async (product: Product) => {
+    const newVal = !product.showInCategory;
+    try {
+      await updateDoc(doc(db, "products", product.id), {
+        showInCategory: newVal,
+        updatedAt: new Date(),
+      });
+
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.id === product.id ? { ...p, showInCategory: newVal } : p
+        )
+      );
+
+      toast.success(newVal ? "Product will now show in category" : "Product hidden from category");
+    } catch (error) {
+      console.error("Error updating showInCategory:", error);
+      toast.error("Failed to update category visibility");
+    }
+  };
+
   const handleProductAdded = (newProduct: Product) => {
     if (editingProduct) {
       const updatedProduct = {
         ...newProduct,
         id: editingProduct.id,
-        isOutOfStock: newProduct.isOutOfStock ?? false, // <-- ADDED
+        isOutOfStock: newProduct.isOutOfStock ?? false,
+        showInCategory: newProduct.showInCategory ?? true, // <-- ADDED
       };
 
       setProducts((prev) =>
@@ -236,7 +261,8 @@ export default function ProductList() {
       const productWithOrder = {
         ...newProduct,
         displayOrder: maxOrder + 1,
-        isOutOfStock: newProduct.isOutOfStock ?? false, // <-- ADDED
+        isOutOfStock: newProduct.isOutOfStock ?? false,
+        showInCategory: newProduct.showInCategory ?? true, // <-- ADDED
       };
       setProducts((prev) => [...prev, productWithOrder]);
       setOriginalProducts((prev) => [...prev, productWithOrder]);
@@ -525,6 +551,16 @@ export default function ProductList() {
         ) : (
           "---"
         ),
+    },
+    {
+      id: "showInCategory",
+      header: "Show in Category",
+      cell: (item) => (
+        <Switch
+          checked={item?.showInCategory ?? true}
+          onCheckedChange={() => handleShowInCategoryToggle(item)}
+        />
+      ),
     },
     {
       id: "category",

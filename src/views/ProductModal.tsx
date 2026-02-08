@@ -121,6 +121,11 @@ const validationSchema = Yup.object({
     "At least one media file (image or video) is required"
   ),
   isBestSeller: Yup.boolean(),
+  metaTitle: Yup.string().max(60, "Meta title should not exceed 60 characters"),
+  metaDescription: Yup.string().max(
+    160,
+    "Meta description should not exceed 160 characters"
+  ),
   customizationOptions: Yup.object().when("orderType", {
     is: (val) =>
       [ORDER_TYPES.CUSTOM_ORDER, ORDER_TYPES.COMMISSION].includes(val),
@@ -178,6 +183,7 @@ const ProductModal = ({
       sectionCategoryIds: editingProduct?.sectionCategoryIds || [],
       menuManagerCategoryIds: editingProduct?.menuManagerCategoryIds || [],
       isBestSeller: editingProduct?.isBestSeller || false,
+      showInCategory: editingProduct?.showInCategory ?? true, // <-- ADDED
       name: editingProduct?.name || "",
       description: editingProduct?.description || "",
       artistId: editingProduct?.artistId || "",
@@ -199,6 +205,8 @@ const ProductModal = ({
       relatedProducts: editingProduct?.relatedProducts || [],
       variants: editingProduct?.variants || [],
       banners: editingProduct?.banners || [],
+      metaTitle: editingProduct?.metaTitle || "",
+      metaDescription: editingProduct?.metaDescription || "",
       customizationOptions: editingProduct?.customizationOptions || {
         allowSizeCustomization: false,
         allowColorCustomization: false,
@@ -647,6 +655,7 @@ const ProductModal = ({
         hasColorVariants: (normalizedVariants?.length || 0) > 0,
         artistName: selectedArtist ? selectedArtist.name : "",
         categoryName: selectedCategory?.name,
+        showInCategory: values.showInCategory ?? true, // <-- ADDED
         createdAt: editingProduct ? editingProduct.createdAt : new Date(),
         updatedAt: new Date(),
         isCustomizable: [
@@ -883,14 +892,25 @@ const ProductModal = ({
               )}
             </div>
 
-            <div className="flex items-center space-x-2">
-              <Label>Best Seller</Label>
-              <Switch
-                checked={formik.values.isBestSeller}
-                onCheckedChange={(val) =>
-                  formik.setFieldValue("isBestSeller", Boolean(val))
-                }
-              />
+            <div className="flex items-center space-x-6">
+              <div className="flex items-center space-x-2">
+                <Label>Best Seller</Label>
+                <Switch
+                  checked={formik.values.isBestSeller}
+                  onCheckedChange={(val) =>
+                    formik.setFieldValue("isBestSeller", Boolean(val))
+                  }
+                />
+              </div>
+              <div className="flex items-center space-x-2">
+                <Label>Show in Category</Label>
+                <Switch
+                  checked={formik.values.showInCategory}
+                  onCheckedChange={(val) =>
+                    formik.setFieldValue("showInCategory", Boolean(val))
+                  }
+                />
+              </div>
             </div>
 
             <div>
@@ -912,6 +932,59 @@ const ProductModal = ({
               {formik.touched.description && formik.errors.description && (
                 <p className="text-red-500 text-sm mt-1">
                   {formik.errors.description}
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* SEO Metadata */}
+        <Card>
+          <CardHeader>
+            <CardTitle>SEO Metadata</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="metaTitle">Meta Title</Label>
+              <Input
+                id="metaTitle"
+                name="metaTitle"
+                placeholder="Enter meta title (max 60 characters)"
+                value={formik.values.metaTitle}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                className={
+                  formik.touched.metaTitle && formik.errors.metaTitle
+                    ? "border-red-500"
+                    : ""
+                }
+              />
+              {formik.touched.metaTitle && formik.errors.metaTitle && (
+                <p className="text-red-500 text-sm mt-1">
+                  {formik.errors.metaTitle}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="metaDescription">Meta Description</Label>
+              <Textarea
+                id="metaDescription"
+                name="metaDescription"
+                placeholder="Enter meta description (max 160 characters)"
+                value={formik.values.metaDescription}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                rows={3}
+                className={
+                  formik.touched.metaDescription && formik.errors.metaDescription
+                    ? "border-red-500"
+                    : ""
+                }
+              />
+              {formik.touched.metaDescription && formik.errors.metaDescription && (
+                <p className="text-red-500 text-sm mt-1">
+                  {formik.errors.metaDescription}
                 </p>
               )}
             </div>
