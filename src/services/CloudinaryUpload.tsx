@@ -75,6 +75,27 @@ const compressImage = (file, maxSizeInMB = 5, quality = 0.8) => {
   });
 };
 
+// Upload video to Cloudinary (no compression needed for video)
+export const uploadVideoToCloudinary = async (videoFile: File): Promise<string> => {
+  try {
+    const formData = new FormData();
+    formData.append("file", videoFile);
+    formData.append("upload_preset", "ecommerce"); // same preset
+    formData.append("cloud_name", cloudinaryConfig.cloudName);
+    formData.append("resource_type", "video");
+
+    const response = await axios.post(
+      `https://api.cloudinary.com/v1_1/${cloudinaryConfig.cloudName}/video/upload`,
+      formData
+    );
+
+    return response.data.secure_url;
+  } catch (error) {
+    console.error("Error uploading video to Cloudinary:", error);
+    throw new Error("Failed to upload video to Cloudinary");
+  }
+};
+
 // Updated upload function with compression
 export const uploadImagesToCloudinary = async (imageFiles) => {
   try {

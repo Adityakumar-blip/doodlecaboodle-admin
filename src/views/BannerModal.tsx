@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { X } from "lucide-react";
+import { X, Image, Video } from "lucide-react";
 import React, { useState, useEffect } from "react";
 import { useFormik } from "formik";
 import * as Yup from "yup";
@@ -17,21 +17,65 @@ import {
   doc,
 } from "firebase/firestore";
 import { toast } from "sonner";
-import { uploadImagesToCloudinary } from "@/services/CloudinaryUpload";
+import {
+  uploadImagesToCloudinary,
+  uploadVideoToCloudinary,
+} from "@/services/CloudinaryUpload";
 
 const db = getFirestore();
 
-const validationSchema = Yup.object({
-  title: Yup.string()
-    .min(2, "Title must be at least 2 characters")
-    .required("Title is required"),
-  description: Yup.string()
-    .min(10, "Description must be at least 10 characters")
-    .required("Description is required"),
-  desktopImage: Yup.string().required("Desktop image is required"),
-  mobileImage: Yup.string().required("Mobile image is required"),
-  url: Yup.string().url("Enter a valid URL").nullable(),
-});
+type MediaType = "image" | "video";
+
+const getValidationSchema = (mediaType: MediaType) =>
+  Yup.object({
+    title: Yup.string()
+      .min(2, "Title must be at least 2 characters")
+      .required("Title is required"),
+    description: Yup.string()
+      .min(10, "Description must be at least 10 characters")
+      .required("Description is required"),
+    desktopImage: Yup.string().required(
+      mediaType === "video"
+        ? "Desktop video is required"
+        : "Desktop image is required"
+    ),
+    mobileImage: Yup.string().required(
+      mediaType === "video"
+        ? "Mobile video is required"
+        : "Mobile image is required"
+    ),
+    url: Yup.string().url("Enter a valid URL").nullable(),
+  });
+
+const MediaPreview: React.FC<{
+  src: string;
+  mediaType: MediaType;
+  onRemove: () => void;
+}> = ({ src, mediaType, onRemove }) => (
+  <div className="relative mt-3 w-40">
+    {mediaType === "video" ? (
+      <video
+        src={src}
+        className="w-full h-32 object-cover rounded border"
+        autoPlay
+        muted
+        loop
+        playsInline
+      />
+    ) : (
+      <img src={src} className="w-full h-32 object-cover rounded border" />
+    )}
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="absolute top-1 right-1 bg-gray-800 bg-opacity-50"
+      onClick={onRemove}
+    >
+      <X className="h-4 w-4 text-white" />
+    </Button>
+  </div>
+);
 
 const BannerModal = ({
   drawerOpen,
@@ -39,6 +83,9 @@ const BannerModal = ({
   onBannerAdded,
   editingBanner,
 }) => {
+  const [mediaType, setMediaType] = useState<MediaType>(
+    editingBanner?.mediaType || "image"
+  );
   const [desktopPreview, setDesktopPreview] = useState<string>("");
   const [mobilePreview, setMobilePreview] = useState<string>("");
   const [desktopFile, setDesktopFile] = useState<File | null>(null);
@@ -53,7 +100,7 @@ const BannerModal = ({
       mobileImage: editingBanner?.mobileImage || "",
       url: editingBanner?.url || "",
     },
-    validationSchema,
+    validationSchema: getValidationSchema(mediaType),
     onSubmit: async (values) => {
       await handleAddBanner(values);
     },
@@ -62,6 +109,7 @@ const BannerModal = ({
 
   useEffect(() => {
     if (editingBanner) {
+      setMediaType(editingBanner.mediaType || "image");
       if (editingBanner.desktopImage) {
         setDesktopPreview(editingBanner.desktopImage);
       }
@@ -71,13 +119,13 @@ const BannerModal = ({
     }
   }, [editingBanner]);
 
-  const handleImageChange = (e, type: "desktop" | "mobile") => {
+  const handleMediaChange = (e: React.ChangeEvent<HTMLInputElement>, slot: "desktop" | "mobile") => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const preview = URL.createObjectURL(file);
 
-    if (type === "desktop") {
+    if (slot === "desktop") {
       setDesktopFile(file);
       setDesktopPreview(preview);
       formik.setFieldValue("desktopImage", preview);
@@ -88,8 +136,8 @@ const BannerModal = ({
     }
   };
 
-  const removeImage = (type: "desktop" | "mobile") => {
-    if (type === "desktop") {
+  const removeMedia = (slot: "desktop" | "mobile") => {
+    if (slot === "desktop") {
       setDesktopFile(null);
       setDesktopPreview("");
       formik.setFieldValue("desktopImage", "");
@@ -100,26 +148,46 @@ const BannerModal = ({
     }
   };
 
+  const handleMediaTypeChange = (type: MediaType) => {
+    // Reset files when switching type
+    setMediaType(type);
+    setDesktopFile(null);
+    setMobileFile(null);
+    setDesktopPreview("");
+    setMobilePreview("");
+    formik.setFieldValue("desktopImage", "");
+    formik.setFieldValue("mobileImage", "");
+  };
+
   const handleAddBanner = async (values) => {
     setLoading(true);
     try {
       let desktopUrl = editingBanner?.desktopImage || "";
       let mobileUrl = editingBanner?.mobileImage || "";
 
-      if (desktopFile) {
-        const uploadResult = await uploadImagesToCloudinary([desktopFile]);
-        desktopUrl = uploadResult; // first uploaded url
-      }
-
-      if (mobileFile) {
-        const uploadResult = await uploadImagesToCloudinary([mobileFile]);
-        mobileUrl = uploadResult; // first uploaded url
+      if (mediaType === "video") {
+        if (desktopFile) {
+          desktopUrl = await uploadVideoToCloudinary(desktopFile);
+        }
+        if (mobileFile) {
+          mobileUrl = await uploadVideoToCloudinary(mobileFile);
+        }
+      } else {
+        if (desktopFile) {
+          const uploadResult = await uploadImagesToCloudinary([desktopFile]);
+          desktopUrl = uploadResult;
+        }
+        if (mobileFile) {
+          const uploadResult = await uploadImagesToCloudinary([mobileFile]);
+          mobileUrl = uploadResult;
+        }
       }
 
       const bannerData = {
         ...values,
         desktopImage: desktopUrl,
         mobileImage: mobileUrl,
+        mediaType,
         url: values.url || "",
         createdAt: editingBanner ? editingBanner.createdAt : new Date(),
         updatedAt: new Date(),
@@ -169,6 +237,10 @@ const BannerModal = ({
     setMobilePreview("");
     setDrawerOpen(false);
   };
+
+  const acceptAttr = mediaType === "video" ? "video/*" : "image/*";
+  const desktopLabel = mediaType === "video" ? "Desktop Video *" : "Desktop Image *";
+  const mobileLabel = mediaType === "video" ? "Mobile Video *" : "Mobile Image *";
 
   return (
     <MasterDrawer
@@ -269,16 +341,56 @@ const BannerModal = ({
           </CardContent>
         </Card>
 
-        {/* Desktop Image Upload */}
+        {/* Media Type Selector */}
         <Card>
           <CardHeader>
-            <CardTitle>Desktop Image *</CardTitle>
+            <CardTitle>Media Type</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => handleMediaTypeChange("image")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all ${
+                  mediaType === "image"
+                    ? "border-blue-600 bg-blue-50 text-blue-700"
+                    : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                }`}
+              >
+                <Image className="h-4 w-4" />
+                Image
+              </button>
+              <button
+                type="button"
+                onClick={() => handleMediaTypeChange("video")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all ${
+                  mediaType === "video"
+                    ? "border-blue-600 bg-blue-50 text-blue-700"
+                    : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                }`}
+              >
+                <Video className="h-4 w-4" />
+                Video
+              </button>
+            </div>
+            {mediaType === "video" && (
+              <p className="text-sm text-gray-500 mt-2">
+                🎬 Videos will autoplay silently and loop on the homepage hero slider.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Desktop Media Upload */}
+        <Card>
+          <CardHeader>
+            <CardTitle>{desktopLabel}</CardTitle>
           </CardHeader>
           <CardContent>
             <Input
               type="file"
-              accept="image/*"
-              onChange={(e) => handleImageChange(e, "desktop")}
+              accept={acceptAttr}
+              onChange={(e) => handleMediaChange(e, "desktop")}
               className="cursor-pointer"
             />
             {formik.touched.desktopImage && formik.errors.desktopImage && (
@@ -287,35 +399,25 @@ const BannerModal = ({
               </p>
             )}
             {desktopPreview && (
-              <div className="relative mt-3 w-40">
-                <img
-                  src={desktopPreview}
-                  className="w-full h-32 object-cover rounded border"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute top-1 right-1 bg-gray-800 bg-opacity-50"
-                  onClick={() => removeImage("desktop")}
-                >
-                  <X className="h-4 w-4 text-white" />
-                </Button>
-              </div>
+              <MediaPreview
+                src={desktopPreview}
+                mediaType={mediaType}
+                onRemove={() => removeMedia("desktop")}
+              />
             )}
           </CardContent>
         </Card>
 
-        {/* Mobile Image Upload */}
+        {/* Mobile Media Upload */}
         <Card>
           <CardHeader>
-            <CardTitle>Mobile Image *</CardTitle>
+            <CardTitle>{mobileLabel}</CardTitle>
           </CardHeader>
           <CardContent>
             <Input
               type="file"
-              accept="image/*"
-              onChange={(e) => handleImageChange(e, "mobile")}
+              accept={acceptAttr}
+              onChange={(e) => handleMediaChange(e, "mobile")}
               className="cursor-pointer"
             />
             {formik.touched.mobileImage && formik.errors.mobileImage && (
@@ -324,21 +426,11 @@ const BannerModal = ({
               </p>
             )}
             {mobilePreview && (
-              <div className="relative mt-3 w-40">
-                <img
-                  src={mobilePreview}
-                  className="w-full h-32 object-cover rounded border"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute top-1 right-1 bg-gray-800 bg-opacity-50"
-                  onClick={() => removeImage("mobile")}
-                >
-                  <X className="h-4 w-4 text-white" />
-                </Button>
-              </div>
+              <MediaPreview
+                src={mobilePreview}
+                mediaType={mediaType}
+                onRemove={() => removeMedia("mobile")}
+              />
             )}
           </CardContent>
         </Card>

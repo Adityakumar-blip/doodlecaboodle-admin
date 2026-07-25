@@ -25,6 +25,7 @@ interface Config {
   id: string;
   quote: string;
   heroBanner: string;
+  announcementMessages?: string[];
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -113,6 +114,23 @@ const ConfigurationDisplay: React.FC = () => {
           {item.heroBanner}
         </div>
       ),
+    },
+    {
+      id: "announcementMessages",
+      header: "Announcement Messages",
+      cell: (item) => {
+        const msgs = item.announcementMessages || [];
+        if (msgs.length === 0) return <span className="text-gray-400">None</span>;
+        return (
+          <div className="max-w-xs truncate font-medium flex flex-wrap gap-1" title={msgs.join(" | ")}>
+            {msgs.map((m, i) => (
+              <span key={i} className="inline-block px-1.5 py-0.5 bg-neutral-100 rounded text-[10px] text-gray-700">
+                {m}
+              </span>
+            ))}
+          </div>
+        );
+      },
     },
     {
       id: "actions",

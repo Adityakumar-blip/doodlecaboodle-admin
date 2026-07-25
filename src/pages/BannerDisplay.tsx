@@ -36,6 +36,7 @@ interface Banner {
   mobileImage?: string;
   desktopImage?: string;
   displayOrder?: number;
+  mediaType?: "image" | "video";
 }
 
 const BannerDisplay: React.FC = () => {
@@ -143,7 +144,11 @@ const BannerDisplay: React.FC = () => {
         </div>
         <div>
           {banner.mobileImage && (
-            <img src={banner.mobileImage} alt={banner.title} className="w-16 h-16 object-cover rounded" />
+            banner.mediaType === "video" ? (
+              <video src={banner.mobileImage} className="w-16 h-16 object-cover rounded" autoPlay muted loop playsInline />
+            ) : (
+              <img src={banner.mobileImage} alt={banner.title} className="w-16 h-16 object-cover rounded" />
+            )
           )}
         </div>
         <div className="text-right text-xs text-gray-500">Order: {banner.displayOrder || index + 1}</div>
@@ -235,11 +240,22 @@ const BannerDisplay: React.FC = () => {
       cell: (item) => (
         <div>
           {item.mobileImage && (
-            <img
-              src={item.mobileImage}
-              alt={item.title}
-              className="w-16 h-16 object-cover rounded"
-            />
+            item.mediaType === "video" ? (
+              <video
+                src={item.mobileImage}
+                className="w-16 h-16 object-cover rounded"
+                autoPlay
+                muted
+                loop
+                playsInline
+              />
+            ) : (
+              <img
+                src={item.mobileImage}
+                alt={item.title}
+                className="w-16 h-16 object-cover rounded"
+              />
+            )
           )}
         </div>
       ),

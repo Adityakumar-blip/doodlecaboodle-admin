@@ -27,6 +27,7 @@ const validationSchema = Yup.object({
   quote: Yup.string().min(5).required("Quote is required"),
   author: Yup.string().min(2).required("Author is required"),
   heroBanner: Yup.string().required("Hero banner image is required"),
+  announcementMessages: Yup.array().of(Yup.string()).optional(),
 });
 
 const ConfigurationModal = ({
@@ -40,11 +41,42 @@ const ConfigurationModal = ({
   const [heroBannerPreview, setHeroBannerPreview] = useState("");
   const [heroBannerFile, setHeroBannerFile] = useState<File | null>(null);
 
+  const [announcementMessages, setAnnouncementMessages] = useState<string[]>([""]);
+
+  useEffect(() => {
+    if (editingConfig?.announcementMessages) {
+      setAnnouncementMessages(editingConfig.announcementMessages);
+    } else {
+      setAnnouncementMessages([""]);
+    }
+  }, [editingConfig]);
+
+  const handleMessageChange = (index: number, val: string) => {
+    const updated = [...announcementMessages];
+    updated[index] = val;
+    setAnnouncementMessages(updated);
+    formik.setFieldValue("announcementMessages", updated);
+  };
+
+  const addMessageField = () => {
+    const updated = [...announcementMessages, ""];
+    setAnnouncementMessages(updated);
+    formik.setFieldValue("announcementMessages", updated);
+  };
+
+  const removeMessageField = (index: number) => {
+    const updated = announcementMessages.filter((_, i) => i !== index);
+    const final = updated.length > 0 ? updated : [""];
+    setAnnouncementMessages(final);
+    formik.setFieldValue("announcementMessages", final);
+  };
+
   const formik: any = useFormik({
     initialValues: {
       quote: editingConfig?.quote || "",
       author: editingConfig?.author || "",
       heroBanner: editingConfig?.heroBanner || "",
+      announcementMessages: editingConfig?.announcementMessages || [""],
     },
     validationSchema,
     onSubmit: async (values) => handleSave(values),
@@ -85,10 +117,15 @@ const ConfigurationModal = ({
         heroBannerUrl = uploadResult;
       }
 
+      const filteredMessages = (values.announcementMessages || []).filter(
+        (msg: string) => msg.trim() !== ""
+      );
+
       const configData = {
         quote: values.quote,
         author: values.author,
         heroBanner: heroBannerUrl,
+        announcementMessages: filteredMessages,
         createdAt: editingConfig ? editingConfig.createdAt : new Date(),
         updatedAt: new Date(),
       };
@@ -191,6 +228,47 @@ const ConfigurationModal = ({
                 <p className="text-red-500 text-sm">{formik.errors.author}</p>
               )}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Announcement Bar */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle>Announcement Bar</CardTitle>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={addMessageField}
+              className="h-8 text-xs font-semibold"
+            >
+              + Add Message
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {announcementMessages.map((message, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <Input
+                  placeholder={`Announcement Message #${index + 1}`}
+                  value={message}
+                  onChange={(e) => handleMessageChange(index, e.target.value)}
+                />
+                {announcementMessages.length > 1 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-red-500 hover:text-red-700 hover:bg-red-50 h-10 w-10 p-0 flex-shrink-0"
+                    onClick={() => removeMessageField(index)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            ))}
+            <p className="text-gray-400 text-xs mt-2 leading-relaxed">
+              These messages will scroll sequentially at the top of the storefront. Leave all empty to hide the announcement bar.
+            </p>
           </CardContent>
         </Card>
 
