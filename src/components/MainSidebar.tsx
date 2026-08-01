@@ -33,6 +33,7 @@ import {
   RemoveFormatting,
   Filter,
   Settings2,
+  Film,
 } from "lucide-react";
 
 interface MainSidebarProps {
@@ -95,6 +96,7 @@ const MainSidebar = ({
 
     { to: "/users", label: "Users", icon: Users2, showTo: true },
     { to: "/banner", label: "Banners", icon: Image, showTo: true },
+    { to: "/reels", label: "Reels Manager", icon: Film, showTo: true },
     {
       to: "/faq-manager",
       label: "FAQ Manager",
@@ -181,13 +183,14 @@ const MainSidebar = ({
                       <NavLink
                         to={item.to}
                         end={item.to === "/dashboard"}
-                        className={({ isActive }) =>
-                          `flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
-                            isActive
+                        className={({ isActive }) => {
+                          const isLinkActive = isActive || location.pathname === item.to || (item.to !== "/dashboard" && location.pathname.startsWith(item.to));
+                          return `flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
+                            isLinkActive
                               ? "bg-artist-purple text-white"
                               : "text-muted-foreground hover:bg-muted"
-                          }`
-                        }
+                          }`;
+                        }}
                       >
                         <item.icon className="h-5 w-5" />
                         {!collapsed && (

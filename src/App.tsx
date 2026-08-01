@@ -39,6 +39,7 @@ import ReviewsDisplay from "./pages/ReviewsDisplay";
 import FilterDisplay from "./pages/FilterDisplay";
 import ConfigurationDisplay from "./pages/ConfigurationDisplay";
 import MenuManager from "./pages/MenuManager";
+import ReelsDisplay from "./pages/ReelsDisplay";
 
 
 const queryClient = new QueryClient();
@@ -86,6 +87,14 @@ const App = () => (
                 element={
                   <AdminLayoutWrapper>
                     <BannerDisplay />
+                  </AdminLayoutWrapper>
+                }
+              />
+              <Route
+                path="/reels"
+                element={
+                  <AdminLayoutWrapper>
+                    <ReelsDisplay />
                   </AdminLayoutWrapper>
                 }
               />
