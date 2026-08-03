@@ -67,6 +67,9 @@ const validationSchema = Yup.object({
   status: Yup.string()
     .oneOf(["active", "inactive"], "Invalid status")
     .required("Status is required"),
+  minPurchaseAmount: Yup.number()
+    .min(0, "Minimum purchase amount must be non-negative")
+    .nullable(),
 });
 
 type CouponModalProps = {
@@ -99,6 +102,7 @@ const CouponModal: React.FC<CouponModalProps> = ({
       validFrom: new Date().toISOString().split("T")[0],
       validUntil: new Date().toISOString().split("T")[0],
       status: "active",
+      minPurchaseAmount: "",
     },
     validationSchema,
     onSubmit: async (values) => {
@@ -145,6 +149,7 @@ const CouponModal: React.FC<CouponModalProps> = ({
           ? new Date(selectedCoupon.validUntil).toISOString().split("T")[0]
           : new Date().toISOString().split("T")[0],
         status: selectedCoupon.status || "active",
+        minPurchaseAmount: selectedCoupon.minPurchaseAmount !== undefined && selectedCoupon.minPurchaseAmount !== null ? selectedCoupon.minPurchaseAmount : "",
       });
     } else {
       formik.resetForm();
@@ -154,6 +159,10 @@ const CouponModal: React.FC<CouponModalProps> = ({
   const handleSubmit = async (values: any) => {
     setLoading(true);
     try {
+      const minAmt = values.minPurchaseAmount !== "" && values.minPurchaseAmount !== null 
+        ? Number(values.minPurchaseAmount) 
+        : null;
+
       const couponData = {
         code: values.code,
         description: values.description,
@@ -161,6 +170,7 @@ const CouponModal: React.FC<CouponModalProps> = ({
         categoryIds: values.categoryIds || null,
         discountValue: values.type === "other" ? values.discountValue : null,
         discountType: values.type === "other" ? values.discountType : null,
+        minPurchaseAmount: minAmt,
         validFrom: new Date(values.validFrom),
         validUntil: new Date(values.validUntil),
         status: values.status,
@@ -547,6 +557,37 @@ const CouponModal: React.FC<CouponModalProps> = ({
               {formik.touched.validUntil && formik.errors.validUntil && (
                 <p className="text-red-500 text-sm mt-1">
                   {formik.errors.validUntil}
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Usage Limits */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Usage Limits</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="minPurchaseAmount">Minimum Purchase Amount (Optional)</Label>
+              <Input
+                id="minPurchaseAmount"
+                name="minPurchaseAmount"
+                type="number"
+                placeholder="Enter minimum purchase amount required (e.g. 1500)"
+                value={formik.values.minPurchaseAmount}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                className={
+                  formik.touched.minPurchaseAmount && formik.errors.minPurchaseAmount
+                    ? "border-red-500"
+                    : ""
+                }
+              />
+              {formik.touched.minPurchaseAmount && formik.errors.minPurchaseAmount && (
+                <p className="text-red-500 text-sm mt-1">
+                  {formik.errors.minPurchaseAmount}
                 </p>
               )}
             </div>

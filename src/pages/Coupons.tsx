@@ -19,6 +19,7 @@ type Coupon = {
   validUntil: Date;
   createdAt: Date;
   updatedAt: Date;
+  minPurchaseAmount?: number;
 };
 
 export default function Coupons() {
@@ -109,6 +110,12 @@ export default function Coupons() {
           ? `${item.discountValue}%`
           : `${item.discountValue}`;
       },
+    },
+    {
+      id: "minPurchaseAmount",
+      header: "Min Purchase",
+      cell: (item) => item.minPurchaseAmount ? `₹${item.minPurchaseAmount}` : "-",
+      sortable: true,
     },
     {
       id: "validUntil",

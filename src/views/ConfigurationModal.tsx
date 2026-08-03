@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { X } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 
 import React, { useEffect, useState } from "react";
 import { useFormik } from "formik";
@@ -28,6 +30,17 @@ const validationSchema = Yup.object({
   author: Yup.string().min(2).required("Author is required"),
   heroBanner: Yup.string().required("Hero banner image is required"),
   announcementMessages: Yup.array().of(Yup.string()).optional(),
+  showDiscountModal: Yup.boolean().optional(),
+  discountModalCouponCode: Yup.string().when("showDiscountModal", {
+    is: true,
+    then: (schema) => schema.required("Coupon code is required when discount modal is enabled"),
+    otherwise: (schema) => schema.nullable(),
+  }),
+  discountModalDescription: Yup.string().when("showDiscountModal", {
+    is: true,
+    then: (schema) => schema.required("Modal message description is required when discount modal is enabled"),
+    otherwise: (schema) => schema.nullable(),
+  }),
 });
 
 const ConfigurationModal = ({
@@ -77,6 +90,9 @@ const ConfigurationModal = ({
       author: editingConfig?.author || "",
       heroBanner: editingConfig?.heroBanner || "",
       announcementMessages: editingConfig?.announcementMessages || [""],
+      showDiscountModal: editingConfig?.showDiscountModal || false,
+      discountModalCouponCode: editingConfig?.discountModalCouponCode || "",
+      discountModalDescription: editingConfig?.discountModalDescription || "",
     },
     validationSchema,
     onSubmit: async (values) => handleSave(values),
@@ -126,6 +142,9 @@ const ConfigurationModal = ({
         author: values.author,
         heroBanner: heroBannerUrl,
         announcementMessages: filteredMessages,
+        showDiscountModal: values.showDiscountModal,
+        discountModalCouponCode: values.showDiscountModal ? values.discountModalCouponCode : "",
+        discountModalDescription: values.showDiscountModal ? values.discountModalDescription : "",
         createdAt: editingConfig ? editingConfig.createdAt : new Date(),
         updatedAt: new Date(),
       };
@@ -300,6 +319,78 @@ const ConfigurationModal = ({
                   <X className="h-4 w-4 text-white" />
                 </Button>
               </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Discount Modal Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Welcome Discount Modal</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="showDiscountModal"
+                checked={formik.values.showDiscountModal}
+                onCheckedChange={(checked) =>
+                  formik.setFieldValue("showDiscountModal", checked)
+                }
+              />
+              <Label htmlFor="showDiscountModal">Enable Discount Modal</Label>
+            </div>
+
+            {formik.values.showDiscountModal && (
+              <>
+                <div>
+                  <Label htmlFor="discountModalCouponCode">Coupon Code *</Label>
+                  <Input
+                    id="discountModalCouponCode"
+                    name="discountModalCouponCode"
+                    placeholder="e.g. DC20"
+                    value={formik.values.discountModalCouponCode}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
+                    className={
+                      formik.touched.discountModalCouponCode &&
+                      formik.errors.discountModalCouponCode
+                        ? "border-red-500"
+                        : ""
+                    }
+                  />
+                  {formik.touched.discountModalCouponCode &&
+                    formik.errors.discountModalCouponCode && (
+                      <p className="text-red-500 text-sm mt-1">
+                        {formik.errors.discountModalCouponCode}
+                      </p>
+                    )}
+                </div>
+
+                <div>
+                  <Label htmlFor="discountModalDescription">Modal Message *</Label>
+                  <Textarea
+                    id="discountModalDescription"
+                    name="discountModalDescription"
+                    rows={4}
+                    placeholder="We’re thrilled to have you here. Enjoy 20% OFF on your first portrait!"
+                    value={formik.values.discountModalDescription}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
+                    className={
+                      formik.touched.discountModalDescription &&
+                      formik.errors.discountModalDescription
+                        ? "border-red-500"
+                        : ""
+                    }
+                  />
+                  {formik.touched.discountModalDescription &&
+                    formik.errors.discountModalDescription && (
+                      <p className="text-red-500 text-sm mt-1">
+                        {formik.errors.discountModalDescription}
+                      </p>
+                    )}
+                </div>
+              </>
             )}
           </CardContent>
         </Card>

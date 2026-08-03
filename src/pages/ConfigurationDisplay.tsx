@@ -26,6 +26,9 @@ interface Config {
   quote: string;
   heroBanner: string;
   announcementMessages?: string[];
+  showDiscountModal?: boolean;
+  discountModalCouponCode?: string;
+  discountModalDescription?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
